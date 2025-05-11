@@ -6,11 +6,16 @@ let fileColumns = [];
 let xColumns = [];
 // 保存选择的目标列
 let yColumn = '';
+// 当前是否有导入的模型
+let isModelImported = false;
 
 document.addEventListener('DOMContentLoaded', function () {
     fetchAvailableModels();
     document.getElementById('file').addEventListener('change', handleFileChange);
     document.getElementById('train-button').addEventListener('click', handleTrainButtonClick);
+    document.getElementById('export-model-button').addEventListener('click', handleExportModelClick);
+    document.getElementById('import-model-file').addEventListener('change', handleImportModelFileChange);
+    document.getElementById('predict-imported-button').addEventListener('click', handlePredictWithImportedModelClick);
 
     // 添加模型选择变化监听
     document.getElementById('model').addEventListener('change', function () {
@@ -29,14 +34,26 @@ function updateStepIndicator(currentStep) {
     steps.forEach((step, index) => {
         const stepNum = index + 1;
 
-        if (stepNum < currentStep) {
-            step.classList.remove('active');
-            step.classList.add('completed');
-        } else if (stepNum === currentStep) {
-            step.classList.add('active');
-            step.classList.remove('completed');
+        // 如果模型已导入，针对步骤3(配置特征)和步骤4(查看结果)特殊处理
+        if (isModelImported && currentStep === 4) {
+            // 导入模型预测时，直接跳到结果步骤
+            if (stepNum === 3) {
+                step.classList.add('completed');
+                step.classList.remove('active');
+            } else if (stepNum === 4) {
+                step.classList.add('active');
+                step.classList.remove('completed');
+            }
         } else {
-            step.classList.remove('active', 'completed');
+            if (stepNum < currentStep) {
+                step.classList.remove('active');
+                step.classList.add('completed');
+            } else if (stepNum === currentStep) {
+                step.classList.add('active');
+                step.classList.remove('completed');
+            } else {
+                step.classList.remove('active', 'completed');
+            }
         }
     });
 }
@@ -148,49 +165,49 @@ function displayColumnSelections(columns) {
     // 清空现有选项
     xColumns = [];
     yColumn = '';
-    
+
     // 显示特征列选择
     const xColumnsContainer = document.getElementById('x-columns-container');
     xColumnsContainer.innerHTML = '';
-    
+
     // 显示目标列选择
     const yColumnContainer = document.getElementById('y-column-container');
     yColumnContainer.innerHTML = '';
-    
+
     // 更新计数器初始状态
     updateColumnsCounter('x', 0);
     updateColumnsCounter('y', '');
-    
+
     // 设置搜索框和全选按钮事件
     setupSearchFilter('x-search', 'x-columns-container');
     setupSearchFilter('y-search', 'y-column-container');
-    
+
     document.getElementById('select-all-x').addEventListener('click', () => selectAllColumns(true));
     document.getElementById('deselect-all-x').addEventListener('click', () => selectAllColumns(false));
-    
+
     // 填充列选项
     columns.forEach(column => {
         // 为X列创建复选框
         const xColumnItem = document.createElement('div');
         xColumnItem.className = 'column-item';
         xColumnItem.dataset.columnName = column;
-        
+
         const xCheckbox = document.createElement('input');
         xCheckbox.type = 'checkbox';
         xCheckbox.className = 'column-checkbox';
         xCheckbox.id = `x-${column}`;
         xCheckbox.value = column;
-        
+
         const xLabel = document.createElement('label');
         xLabel.htmlFor = `x-${column}`;
         xLabel.textContent = column;
-        
+
         xColumnItem.appendChild(xCheckbox);
         xColumnItem.appendChild(xLabel);
         xColumnsContainer.appendChild(xColumnItem);
-        
+
         // 为整个列项添加点击事件
-        xColumnItem.addEventListener('click', function(e) {
+        xColumnItem.addEventListener('click', function (e) {
             // 如果点击的是复选框本身，不需要额外处理
             if (e.target !== xCheckbox) {
                 xCheckbox.checked = !xCheckbox.checked;
@@ -199,8 +216,8 @@ function displayColumnSelections(columns) {
                 xCheckbox.dispatchEvent(event);
             }
         });
-        
-        xCheckbox.addEventListener('change', function() {
+
+        xCheckbox.addEventListener('change', function () {
             if (this.checked) {
                 // 将列添加到特征列数组
                 if (!xColumns.includes(column)) {
@@ -214,10 +231,10 @@ function displayColumnSelections(columns) {
                     yColumn = '';
                     updateColumnsCounter('y', '');
                 }
-                
+
                 // 更新计数器
                 updateColumnsCounter('x', xColumns.length);
-                
+
                 // 如果至少选择了一个特征列和一个目标列，更新步骤
                 if (xColumns.length > 0 && yColumn) {
                     updateStepIndicator(3);
@@ -226,39 +243,39 @@ function displayColumnSelections(columns) {
                 // 从特征列数组中移除
                 xColumns = xColumns.filter(col => col !== column);
                 xColumnItem.classList.remove('selected');
-                
+
                 // 更新计数器
                 updateColumnsCounter('x', xColumns.length);
-                
+
                 // 如果没有选择特征列，退回步骤
                 if (xColumns.length === 0) {
                     updateStepIndicator(2);
                 }
             }
         });
-        
+
         // 为Y列创建单选按钮
         const yColumnItem = document.createElement('div');
         yColumnItem.className = 'column-item';
         yColumnItem.dataset.columnName = column;
-        
+
         const yRadio = document.createElement('input');
         yRadio.type = 'radio';
         yRadio.className = 'column-radio';
         yRadio.name = 'y-column';
         yRadio.id = `y-${column}`;
         yRadio.value = column;
-        
+
         const yLabel = document.createElement('label');
         yLabel.htmlFor = `y-${column}`;
         yLabel.textContent = column;
-        
+
         yColumnItem.appendChild(yRadio);
         yColumnItem.appendChild(yLabel);
         yColumnContainer.appendChild(yColumnItem);
-        
+
         // 为整个列项添加点击事件
-        yColumnItem.addEventListener('click', function(e) {
+        yColumnItem.addEventListener('click', function (e) {
             // 如果点击的是单选框本身，不需要额外处理
             if (e.target !== yRadio) {
                 yRadio.checked = true;
@@ -267,20 +284,20 @@ function displayColumnSelections(columns) {
                 yRadio.dispatchEvent(event);
             }
         });
-        
-        yRadio.addEventListener('change', function() {
+
+        yRadio.addEventListener('change', function () {
             if (this.checked) {
                 // 先移除之前选中项的样式
                 if (yColumn) {
                     const prevItem = document.querySelector(`.column-item[data-column-name="${yColumn}"]`);
                     if (prevItem) prevItem.classList.remove('selected');
                 }
-                
+
                 // 设置目标列
                 yColumn = column;
                 yColumnItem.classList.add('selected');
                 updateColumnsCounter('y', yColumn);
-                
+
                 // 如果该列被选为特征列，则取消选择
                 const xCheckbox = document.getElementById(`x-${column}`);
                 if (xCheckbox && xCheckbox.checked) {
@@ -289,7 +306,7 @@ function displayColumnSelections(columns) {
                     xColumns = xColumns.filter(col => col !== column);
                     updateColumnsCounter('x', xColumns.length);
                 }
-                
+
                 // 如果至少选择了一个特征列和一个目标列，更新步骤
                 if (xColumns.length > 0 && yColumn) {
                     updateStepIndicator(3);
@@ -304,12 +321,12 @@ function displayColumnSelections(columns) {
  */
 function setupSearchFilter(searchId, containerId) {
     const searchInput = document.getElementById(searchId);
-    
-    searchInput.addEventListener('input', function() {
+
+    searchInput.addEventListener('input', function () {
         const searchTerm = this.value.toLowerCase();
         const columnsContainer = document.getElementById(containerId);
         const columnItems = columnsContainer.querySelectorAll('.column-item');
-        
+
         columnItems.forEach(item => {
             const columnName = item.dataset.columnName.toLowerCase();
             if (columnName.includes(searchTerm)) {
@@ -328,12 +345,12 @@ function selectAllColumns(select) {
     const xColumnsContainer = document.getElementById('x-columns-container');
     const checkboxes = xColumnsContainer.querySelectorAll('.column-checkbox:not([disabled])');
     const visibleItems = xColumnsContainer.querySelectorAll('.column-item:not(.hidden-column)');
-    
+
     visibleItems.forEach(item => {
         const checkbox = item.querySelector('.column-checkbox');
         if (checkbox && checkbox.checked !== select) {
             checkbox.checked = select;
-            
+
             // 手动触发change事件
             const event = new Event('change');
             checkbox.dispatchEvent(event);
@@ -358,6 +375,7 @@ function updateColumnsCounter(type, count) {
 async function handleTrainButtonClick() {
     // 重置错误信息
     clearErrors();
+    hideImportSuccessMessage(); // 隐藏导入成功消息
 
     // 验证输入
     if (!validateInputs()) {
@@ -366,6 +384,11 @@ async function handleTrainButtonClick() {
 
     // 显示加载状态
     showLoading(true);
+
+    // 隐藏相关按钮
+    document.getElementById('export-model-button').style.display = 'none';
+    document.getElementById('predict-imported-button').style.display = 'none';
+    isModelImported = false; // 重置导入模型状态
 
     // 准备表单数据
     const formData = new FormData();
@@ -382,25 +405,30 @@ async function handleTrainButtonClick() {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP错误 ${response.status}`);
+            const errorData = await response.json();
+            throw new Error(errorData.detail || `HTTP错误 ${response.status}`);
         }
 
         const result = await response.json();
 
         // 处理结果
         displayResults(result);
-
         // 更新步骤指示器
         updateStepIndicator(4);
+        // 显示导出模型按钮
+        document.getElementById('export-model-button').style.display = 'inline-block';
+        // 更新UI状态
+        updateUIAfterModelStatusChange();
 
         // 平滑滚动到结果区域
         document.getElementById('results').scrollIntoView({
             behavior: 'smooth',
             block: 'start'
         });
+
     } catch (error) {
         console.error('训练请求失败:', error);
-        showError('server-error', '服务请求失败，请检查服务是否启动或稍后重试。');
+        showError('server-error', `服务请求失败: ${error.message}`);
     } finally {
         showLoading(false);
     }
@@ -455,7 +483,6 @@ function showError(elementId, message) {
     if (element) {
         element.textContent = message;
         element.style.display = 'block';
-
         // 添加错误动画
         element.classList.add('animate-error');
         setTimeout(() => {
@@ -498,11 +525,18 @@ function displayResults(result) {
     const resultsElement = document.getElementById('results');
     resultsElement.style.display = 'block';
 
+    // 清空旧数据
+    document.getElementById('metrics-table').getElementsByTagName('tbody')[0].innerHTML = '';
+
     // 显示指标
-    displayMetrics(result.metrics);
+    if (result.metrics) {
+        displayMetrics(result.metrics);
+    }
 
     // 显示图表
-    displayPlots(result.plots);
+    if (result.plots) {
+        displayPlots(result.plots);
+    }
 }
 
 /**
@@ -532,7 +566,6 @@ function displayMetrics(metrics) {
         const valueCell = row.insertCell(1);
 
         nameCell.textContent = metricNames[key] || key;
-
         // 格式化数值（保留4位小数）
         valueCell.textContent = typeof value === 'number' ? value.toFixed(4) : value;
 
@@ -549,23 +582,246 @@ function displayMetrics(metrics) {
  */
 function displayPlots(plots) {
     // 特征重要性图
+    const featureImportancePlot = document.getElementById('feature-importance-plot');
+    const featureImportanceCard = featureImportancePlot.closest('.card');
+
     if (plots.feature_importance) {
-        document.getElementById('feature-importance-plot').src = `data:image/png;base64,${plots.feature_importance}`;
+        featureImportancePlot.src = `data:image/png;base64,${plots.feature_importance}`;
+        featureImportanceCard.style.display = 'block';
+    } else {
+        featureImportanceCard.style.display = 'none';
     }
 
     // 学习曲线图
+    const learningCurvePlot = document.getElementById('learning-curve-plot');
+    const learningCurveCard = learningCurvePlot.closest('.card');
+
+    let learningCurveSrc = null;
     if (plots.learning_curve) {
-        document.getElementById('learning-curve-plot').src = `data:image/png;base64,${plots.learning_curve}`;
+        learningCurveSrc = `data:image/png;base64,${plots.learning_curve}`;
     } else if (plots.accuracy_curve) {
-        document.getElementById('learning-curve-plot').src = `data:image/png;base64,${plots.accuracy_curve}`;
+        learningCurveSrc = `data:image/png;base64,${plots.accuracy_curve}`;
     }
 
-    // 预测结果图
+    if (learningCurveSrc) {
+        learningCurvePlot.src = learningCurveSrc;
+        learningCurveCard.style.display = 'block';
+    } else {
+        learningCurveCard.style.display = 'none';
+    }
+
+    // 预测结果图 (混淆矩阵, ROC, 或预测vs真实)
+    const predictionPlot = document.getElementById('prediction-plot');
+    const predictionCard = predictionPlot.closest('.card');
+
+    let predictionPlotSrc = null;
     if (plots.confusion_matrix) {
-        document.getElementById('prediction-plot').src = `data:image/png;base64,${plots.confusion_matrix}`;
+        predictionPlotSrc = `data:image/png;base64,${plots.confusion_matrix}`;
     } else if (plots.roc_curve) {
-        document.getElementById('prediction-plot').src = `data:image/png;base64,${plots.roc_curve}`;
+        predictionPlotSrc = `data:image/png;base64,${plots.roc_curve}`;
     } else if (plots.prediction_vs_actual) {
-        document.getElementById('prediction-plot').src = `data:image/png;base64,${plots.prediction_vs_actual}`;
+        predictionPlotSrc = `data:image/png;base64,${plots.prediction_vs_actual}`;
+    }
+
+    if (predictionPlotSrc) {
+        predictionPlot.src = predictionPlotSrc;
+        predictionCard.style.display = 'block';
+    } else {
+        predictionCard.style.display = 'none';
+    }
+}
+
+/**
+ * 处理导出模型按钮点击
+ */
+async function handleExportModelClick() {
+    showLoading(true);
+    clearErrors();
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/export-model`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || `HTTP错误 ${response.status}`);
+        }
+
+        // 创建下载链接
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'exported_model_package.zip';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+
+        // 显示成功消息
+        showImportSuccessMessage('模型导出成功！');
+
+    } catch (error) {
+        console.error('导出模型失败:', error);
+        showError('import-model-error', `导出模型失败: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+/**
+ * 处理导入模型文件选择变化
+ */
+async function handleImportModelFileChange(event) {
+    const fileInput = event.target;
+    if (!fileInput.files || fileInput.files.length === 0) {
+        return;
+    }
+
+    const file = fileInput.files[0];
+    if (!file.name.endsWith('.zip')) {
+        showError('import-model-error', '请上传 .zip 格式的模型包文件。');
+        return;
+    }
+
+    clearErrors();
+    hideImportSuccessMessage();
+    showLoading(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/import-model`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || `HTTP错误 ${response.status}`);
+        }
+
+        // 显示成功消息
+        showImportSuccessMessage(result.message);
+        // 设置导入模型状态
+        isModelImported = true;
+        updateUIAfterModelStatusChange();
+        updateStepIndicator(3); // 导入后准备配置新数据的特征
+
+    } catch (error) {
+        console.error('导入模型失败:', error);
+        showError('import-model-error', `导入模型失败: ${error.message}`);
+        isModelImported = false;
+        updateUIAfterModelStatusChange();
+    } finally {
+        showLoading(false);
+        fileInput.value = ''; // 重置文件输入框
+    }
+}
+
+/**
+ * 处理使用导入模型预测按钮点击
+ */
+async function handlePredictWithImportedModelClick() {
+    clearErrors();
+    hideImportSuccessMessage();
+
+    // 验证新数据文件和列选择
+    const fileInput = document.getElementById('file');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showError('file-error', '请为导入的模型上传新的数据文件进行预测');
+        return;
+    }
+
+    const fileName = fileInput.files[0].name;
+    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
+        showError('file-error', '请上传.xlsx、.xls或.csv格式的文件');
+        return;
+    }
+
+    if (xColumns.length === 0) {
+        showError('x-columns-error', '请为新数据选择至少一个特征列');
+        return;
+    }
+
+    if (!yColumn) {
+        showError('y-column-error', '请为新数据选择一个目标列用于评估');
+        return;
+    }
+
+    showLoading(true);
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('x_columns', JSON.stringify(xColumns));
+    formData.append('y_column', yColumn);
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/predict-with-imported-model`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || `HTTP错误 ${response.status}`);
+        }
+
+        // 显示预测结果
+        displayResults(result);
+        updateStepIndicator(4); // 显示结果步骤
+
+        // 平滑滚动到结果区域
+        document.getElementById('results').scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+        });
+
+    } catch (error) {
+        console.error('使用导入模型预测失败:', error);
+        showError('server-error', `预测失败: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+/**
+ * 显示导入成功消息
+ */
+function showImportSuccessMessage(message) {
+    const successElement = document.getElementById('import-model-success');
+    successElement.textContent = message;
+    successElement.style.display = 'block';
+}
+
+/**
+ * 隐藏导入成功消息
+ */
+function hideImportSuccessMessage() {
+    document.getElementById('import-model-success').style.display = 'none';
+}
+
+/**
+ * 更新UI以反映模型状态变化
+ */
+function updateUIAfterModelStatusChange() {
+    const trainButton = document.getElementById('train-button');
+    const exportButton = document.getElementById('export-model-button');
+    const predictImportedButton = document.getElementById('predict-imported-button');
+
+    if (isModelImported) {
+        trainButton.innerHTML = '<i class="bi bi-play-fill"></i> 开始新训练';
+        exportButton.style.display = 'inline-block'; // 导入的模型也可以导出
+        predictImportedButton.style.display = 'inline-block';
+    } else {
+        trainButton.innerHTML = '<i class="bi bi-play-fill"></i> 开始训练';
+        predictImportedButton.style.display = 'none';
+        // 不要在这里隐藏导出按钮，因为训练成功后也需要显示
+        // 仅在调用handleTrainButtonClick时才隐藏，然后在训练成功后再显示
     }
 }

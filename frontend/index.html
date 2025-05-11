@@ -594,8 +594,10 @@
                                     <i class="bi bi-search search-icon"></i>
                                 </div>
                                 <div class="column-actions">
-                                    <button type="button" class="action-btn" id="select-all-x"><i class="bi bi-check-all"></i> 全选</button>
-                                    <button type="button" class="action-btn" id="deselect-all-x"><i class="bi bi-x-lg"></i> 取消全选</button>
+                                    <button type="button" class="action-btn" id="select-all-x"><i
+                                            class="bi bi-check-all"></i> 全选</button>
+                                    <button type="button" class="action-btn" id="deselect-all-x"><i
+                                            class="bi bi-x-lg"></i> 取消全选</button>
                                 </div>
                             </div>
                             <div class="columns-container" id="x-columns-container">
@@ -628,6 +630,23 @@
             </div>
 
             <button id="train-button"><i class="bi bi-play-fill"></i> 开始训练</button>
+            <button id="export-model-button" style="display:none; margin-left: 10px;"><i
+                    class="bi bi-box-arrow-down"></i> 导出模型</button>
+            <button id="predict-imported-button" style="display:none; margin-left: 10px;"><i
+                    class="bi bi-play-circle"></i> 使用导入模型预测</button>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <i class="bi bi-box-arrow-in-up"></i>
+                <h2>模型管理</h2>
+            </div>
+            <div class="form-group">
+                <label for="import-model-file"><i class="bi bi-upload"></i> 导入模型包 (.zip)</label>
+                <input type="file" id="import-model-file" accept=".zip">
+                <div class="error" id="import-model-error"></div>
+                <div id="import-model-success" style="color:var(--success-color); display:none; margin-top:10px;"></div>
+            </div>
         </div>
 
         <div class="loading" id="loading">
