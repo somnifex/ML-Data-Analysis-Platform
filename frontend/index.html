@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>机器学习分析平台</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --primary-light: #4895ef;
+            --primary-dark: #3a0ca3;
+            --secondary-color: #4cc9f0;
+            --accent-color: #f72585;
+            --text-color: #2b2d42;
+            --text-light: #8d99ae;
+            --background-color: #f8f9fa;
+            --card-color: #ffffff;
+            --success-color: #52b788;
+            --warning-color: #e9c46a;
+            --danger-color: #e63946;
+            --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.16);
+            --border-radius-sm: 8px;
+            --border-radius-md: 12px;
+            --border-radius-lg: 16px;
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
+            line-height: 1.7;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            transition: all var(--transition-speed) ease;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 20px;
+            width: 100%;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+            text-align: center;
+            padding: 40px 0;
+            margin-bottom: 30px;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 70%);
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.2rem;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        header p {
+            margin-top: 10px;
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .card {
+            background-color: var(--card-color);
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 25px;
+            margin-bottom: 25px;
+            transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--primary-dark);
+            position: relative;
+            padding-bottom: 10px;
+        }
+
+        h2::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 40px;
+            height: 3px;
+            background-color: var(--primary-light);
+            border-radius: 3px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e1e5eb;
+            border-radius: var(--border-radius-sm);
+            font-size: 1rem;
+            transition: all 0.2s;
+            background-color: #fcfcfc;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+        }
+
+        input[type="file"] {
+            padding: 10px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: var(--border-radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background-color: var(--text-light);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        button i {
+            margin-right: 8px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(67, 97, 238, 0.2);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading p {
+            margin-top: 15px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .results {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            border-radius: var(--border-radius-sm);
+            overflow: hidden;
+        }
+
+        .metrics-table th,
+        .metrics-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e1e5eb;
+        }
+
+        .metrics-table th {
+            background-color: #f7f9fc;
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        .metrics-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .metrics-table tr:hover td {
+            background-color: #f9fafc;
+        }
+
+        .plot-container {
+            margin: 20px 0;
+            border-radius: var(--border-radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .plot-container:hover {
+            transform: scale(1.02);
+            box-shadow: var(--shadow-md);
+        }
+
+        .plot-image {
+            width: 100%;
+            border-radius: var(--border-radius-md);
+            display: block;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 20px;
+        }
+
+        .col-12 {
+            grid-column: span 12;
+        }
+
+        .col-6 {
+            grid-column: span 6;
+        }
+
+        @media screen and (max-width: 992px) {
+            .col-6 {
+                grid-column: span 12;
+            }
+        }
+
+        .columns-container {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e1e5eb;
+            border-radius: var(--border-radius-sm);
+            padding: 12px;
+            margin-top: 10px;
+            background-color: #fcfcfc;
+            scrollbar-width: thin;
+        }
+
+        .columns-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .columns-container::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 4px;
+        }
+
+        .column-item {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: var(--border-radius-sm);
+            transition: background-color 0.2s;
+        }
+
+        .column-item:hover {
+            background-color: #f0f4f8;
+        }
+
+        .column-checkbox,
+        .column-radio {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .error {
+            color: var(--danger-color);
+            font-size: 0.9rem;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        .error:before {
+            content: "\f621";
+            font-family: "bootstrap-icons";
+            margin-right: 5px;
+        }
+
+        .success {
+            color: var(--success-color);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-title i {
+            margin-right: 10px;
+            font-size: 1.5rem;
+            color: var(--primary-color);
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px 0;
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .step-indicator {
+            display: flex;
+            margin-bottom: 30px;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        .step-indicator::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: #e1e5eb;
+            z-index: 1;
+        }
+
+        .step {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #e1e5eb;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            position: relative;
+            z-index: 2;
+        }
+
+        .step.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .step.completed {
+            background-color: var (--success-color);
+            color: white;
+        }
+
+        .step-label {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* 列选择优化样式 */
+        .column-controls {
+            display: flex;
+            margin-bottom: 10px;
+            gap: 10px;
+            flex-direction: column;
+        }
+
+        .search-container {
+            position: relative;
+            flex-grow: 1;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px 8px 35px;
+            border: 1px solid #e1e5eb;
+            border-radius: var (--border-radius-sm);
+            background-color: #fcfcfc;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var (--text-light);
+        }
+
+        .column-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            background-color: #f0f4f8;
+            color: var (--primary-color);
+            border: 1px solid #e1e5eb;
+            box-shadow: none;
+        }
+
+        .action-btn:hover {
+            background-color: var (--primary-light);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .columns-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid #e1e5eb;
+            border-radius: var (--border-radius-sm);
+            padding: 12px;
+            margin-top: 10px;
+            background-color: #fcfcfc;
+            scrollbar-width: thin;
+        }
+
+        .column-item {
+            margin-bottom: 5px;
+            padding: 8px;
+            border-radius: var (--border-radius-sm);
+            transition: background-color 0.2s;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+
+        .column-item:hover {
+            background-color: #f0f4f8;
+            border-color: #e1e5eb;
+        }
+
+        .column-item.selected {
+            background-color: rgba(67, 97, 238, 0.08);
+            border-color: var (--primary-light);
+        }
+
+        .column-checkbox,
+        .column-radio {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .columns-counter {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            color: var (--text-light);
+        }
+
+        .columns-counter span {
+            font-weight: 600;
+            color: var (--primary-color);
+        }
+
+        .hidden-column {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>智能数据分析平台</h1>
+            <p>上传数据，选择模型，开启AI驱动的数据分析之旅</p>
+        </header>
+
+        <div class="step-indicator">
+            <div class="step active" id="step-1">1<span class="step-label">上传数据</span></div>
+            <div class="step" id="step-2">2<span class="step-label">选择模型</span></div>
+            <div class="step" id="step-3">3<span class="step-label">配置特征</span></div>
+            <div class="step" id="step-4">4<span class="step-label">查看结果</span></div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <i class="bi bi-gear-fill"></i>
+                <h2>参数配置</h2>
+            </div>
+
+            <div class="form-group">
+                <label for="file"><i class="bi bi-file-earmark-excel"></i> 上传数据文件</label>
+                <input type="file" id="file" accept=".xlsx,.xls,.csv">
+                <div class="error" id="file-error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="model"><i class="bi bi-robot"></i> 选择机器学习模型</label>
+                <select id="model">
+                    <option value="">-- 请选择模型 --</option>
+                    <!-- 模型选项将通过JavaScript动态加载 -->
+                </select>
+                <div class="error" id="model-error"></div>
+            </div>
+
+            <div id="columns-selection" style="display: none;">
+                <div class="grid">
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label><i class="bi bi-input-cursor-text"></i> 选择特征列 (X)</label>
+                            <div class="column-controls">
+                                <div class="search-container">
+                                    <input type="text" id="x-search" placeholder="搜索特征列..." class="search-input">
+                                    <i class="bi bi-search search-icon"></i>
+                                </div>
+                                <div class="column-actions">
+                                    <button type="button" class="action-btn" id="select-all-x"><i class="bi bi-check-all"></i> 全选</button>
+                                    <button type="button" class="action-btn" id="deselect-all-x"><i class="bi bi-x-lg"></i> 取消全选</button>
+                                </div>
+                            </div>
+                            <div class="columns-container" id="x-columns-container">
+                                <!-- 列名选择框将在文件上传后动态加载 -->
+                                <div class="loading-columns">请先上传文件...</div>
+                            </div>
+                            <div class="columns-counter" id="x-columns-counter">已选择 <span>0</span> 个特征</div>
+                            <div class="error" id="x-columns-error"></div>
+                        </div>
+                    </div>
+
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label><i class="bi bi-bullseye"></i> 选择目标列 (Y)</label>
+                            <div class="column-controls">
+                                <div class="search-container">
+                                    <input type="text" id="y-search" placeholder="搜索目标列..." class="search-input">
+                                    <i class="bi bi-search search-icon"></i>
+                                </div>
+                            </div>
+                            <div class="columns-container" id="y-column-container">
+                                <!-- 目标列选项将在文件上传后动态加载 -->
+                                <div class="loading-columns">请先上传文件...</div>
+                            </div>
+                            <div class="columns-counter" id="y-columns-counter">已选择目标: <span></span></div>
+                            <div class="error" id="y-column-error"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="train-button"><i class="bi bi-play-fill"></i> 开始训练</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在处理数据并训练模型，请稍候...</p>
+        </div>
+
+        <div class="results" id="results">
+            <div class="card">
+                <div class="section-title">
+                    <i class="bi bi-bar-chart-fill"></i>
+                    <h2>模型评估指标</2>
+                </div>
+                <div id="metrics-container">
+                    <table class="metrics-table" id="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>指标</th>
+                                <th>值</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title">
+                    <i class="bi bi-graph-up"></i>
+                    <h2>特征重要性</h2>
+                </div>
+                <div class="plot-container">
+                    <img id="feature-importance-plot" class="plot-image" alt="特征重要性图">
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="col-6">
+                    <div class="card">
+                        <div class="section-title">
+                            <i class="bi bi-activity"></i>
+                            <h2>学习曲线</h2>
+                        </div>
+                        <div class="plot-container">
+                            <img id="learning-curve-plot" class="plot-image" alt="学习曲线图">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-6">
+                    <div class="card">
+                        <div class="section-title">
+                            <i class="bi bi-check-circle-fill"></i>
+                            <h2>预测结果</h2>
+                        </div>
+                        <div class="plot-container">
+                            <img id="prediction-plot" class="plot-image" alt="预测结果图">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            &copy; 智能数据分析平台 | 基于机器学习的智能数据分析工具
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
