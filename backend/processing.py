@@ -279,7 +279,7 @@ def apply_saved_preprocessing(
 
 def calculate_feature_importance(X_train, y_train, feature_names, model_name):
     """
-    计算特征重要性
+    计算特征重要性并生成多种可视化图表
     """
     is_classification = len(np.unique(y_train)) < 10
 
@@ -291,15 +291,122 @@ def calculate_feature_importance(X_train, y_train, feature_names, model_name):
     rf_model.fit(X_train, y_train)
 
     importances = rf_model.feature_importances_
-
+    
+    # 计算标准差，用于误差条显示
+    if hasattr(rf_model, 'estimators_'):
+        std = np.std([tree.feature_importances_ for tree in rf_model.estimators_], axis=0)
+    else:
+        std = np.zeros_like(importances)
+    
     indices = np.argsort(importances)[::-1]
     sorted_features = [feature_names[i] for i in indices]
     sorted_importances = importances[indices]
+    sorted_std = std[indices]
+    
+    # 生成多种特征重要性可视化图
+    visualizations = {}
+    
+    # 1. 水平条形图 - 增强版本
+    plt.figure(figsize=(10, 8))
+    top_n = min(15, len(sorted_features))
+    plt.barh(range(top_n), sorted_importances[:top_n], align='center', 
+             color='skyblue', edgecolor='navy', alpha=0.8,
+             xerr=sorted_std[:top_n], capsize=5)
+    plt.yticks(range(top_n), sorted_features[:top_n])
+    plt.xlabel('Importance Score')
+    plt.ylabel('Features')
+    plt.title('Feature Importance Ranking')
+    plt.grid(True, axis='x', linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    visualizations['horizontal_bar'] = fig_to_base64(plt.gcf())
+    plt.close()
+    
+    # 2. 垂直条形图 - 带颜色渐变
+    plt.figure(figsize=(12, 8))
+    top_n = min(15, len(sorted_features))
+    bars = plt.bar(range(top_n), sorted_importances[:top_n], 
+           yerr=sorted_std[:top_n], align='center', alpha=0.8,
+           color=plt.cm.viridis(np.linspace(0, 1, top_n)))
+    plt.xticks(range(top_n), sorted_features[:top_n], rotation=45, ha='right')
+    plt.ylabel('Importance Score')
+    plt.xlabel('Features')
+    plt.title('Top Features by Importance')
+    plt.grid(True, axis='y', linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    visualizations['vertical_bar'] = fig_to_base64(plt.gcf())
+    plt.close()
+    
+    # 3. 饼图 - 显示最重要的特征比例
+    plt.figure(figsize=(10, 10))
+    top_n = min(8, len(sorted_features))
+    # 确保重要性值为正
+    pie_values = np.maximum(0, sorted_importances[:top_n])
+    # 添加其他类别
+    if len(sorted_features) > top_n:
+        pie_values = np.append(pie_values, sum(sorted_importances[top_n:]))
+        labels = sorted_features[:top_n] + ['Other Features']
+    else:
+        labels = sorted_features[:top_n]
+    
+    plt.pie(pie_values, labels=labels, autopct='%1.1f%%', 
+            shadow=True, startangle=90, 
+            colors=plt.cm.tab10(np.linspace(0, 1, len(pie_values))))
+    plt.axis('equal')  # 保持饼图为圆形
+    plt.title('Feature Importance Distribution')
+    plt.tight_layout()
+    visualizations['pie'] = fig_to_base64(plt.gcf())
+    plt.close()
+    
+    # 4. 热图 - 重要特征之间的相关性矩阵
+    if len(sorted_features) > 2:
+        plt.figure(figsize=(10, 8))
+        top_n = min(12, len(sorted_features))
+        top_features = [feature_names[i] for i in indices[:top_n]]
+        X_top = X_train[top_features]
+        
+        # 计算相关矩阵
+        corr = X_top.corr()
+        
+        mask = np.triu(np.ones_like(corr, dtype=bool))
+        sns.heatmap(corr, mask=mask, cmap='coolwarm', vmax=1, vmin=-1, center=0,
+                    annot=True, fmt='.2f', square=True, linewidths=.5)
+        plt.title('Correlation Matrix of Top Features')
+        plt.tight_layout()
+        visualizations['correlation'] = fig_to_base64(plt.gcf())
+        plt.close()
+    
+    # 5. 累积重要性图
+    plt.figure(figsize=(10, 6))
+    cumulative_importance = np.cumsum(sorted_importances)
+    plt.plot(range(1, len(sorted_features) + 1), cumulative_importance, 
+             marker='o', linestyle='-', color='#1f77b4', markersize=5)
+    
+    # 添加90%和95%重要性的参考线
+    plt.axhline(y=0.9, color='r', linestyle='--', label='90% Importance')
+    plt.axhline(y=0.95, color='g', linestyle='--', label='95% Importance')
+    
+    # 找到达到90%和95%重要性所需的特征数量
+    features_90 = np.where(cumulative_importance >= 0.9)[0][0] + 1
+    features_95 = np.where(cumulative_importance >= 0.95)[0][0] + 1
+    
+    plt.axvline(x=features_90, color='r', linestyle=':', alpha=0.7)
+    plt.axvline(x=features_95, color='g', linestyle=':', alpha=0.7)
+    
+    plt.xlabel('Number of Features')
+    plt.ylabel('Cumulative Importance')
+    plt.title(f'Cumulative Feature Importance\n(90% at {features_90} features, 95% at {features_95} features)')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend()
+    plt.tight_layout()
+    visualizations['cumulative'] = fig_to_base64(plt.gcf())
+    plt.close()
 
     return {
         "feature_names": sorted_features,
         "importance_values": sorted_importances.tolist(),
+        "std_values": sorted_std.tolist(),
         "model_used": "random_forest",
+        "visualizations": visualizations
     }
 
 
@@ -638,10 +745,18 @@ def generate_plots(
     plots = {}
 
     if importance_data:
+        # 添加特征重要性可视化图表
+        if "visualizations" in importance_data:
+            # 直接从原始数据中添加可视化
+            for viz_name, viz_data in importance_data["visualizations"].items():
+                plots[f"feature_importance_{viz_name}"] = viz_data
+                
+        # 生成标准的特征重要性图
         plt.figure(figsize=(10, 6))
+        num_features = min(10, len(importance_data["feature_names"]))
         plt.barh(
-            importance_data["feature_names"][:10],
-            importance_data["importance_values"][:10],
+            importance_data["feature_names"][:num_features],
+            importance_data["importance_values"][:num_features],
         )
         plt.xlabel("Importance")
         plt.ylabel("Features")

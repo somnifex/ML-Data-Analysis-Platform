@@ -620,6 +620,30 @@ function displayPlots(plots) {
         featureImportancePlot.src = `data:image/png;base64,${plots.feature_importance}`;
         featureImportanceTitle.textContent = '特征重要性';
         featureImportanceCard.style.display = 'block';
+        
+        // 如果存在其他特征重要性可视化，添加到额外图表容器中
+        const extraPlotsContainer = document.getElementById('extra-plots-container');
+        
+        // 添加特征重要性的可视化变体
+        if (plots.feature_importance_horizontal_bar) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_horizontal_bar, '特征重要性排序', 'bar-chart-steps');
+        }
+        
+        if (plots.feature_importance_vertical_bar) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_vertical_bar, '特征重要性条形图', 'bar-chart');
+        }
+        
+        if (plots.feature_importance_pie) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_pie, '特征重要性分布', 'pie-chart');
+        }
+        
+        if (plots.feature_importance_correlation) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_correlation, '重要特征相关性', 'grid-3x3');
+        }
+        
+        if (plots.feature_importance_cumulative) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_cumulative, '特征重要性累积图', 'graph-up');
+        }
     } else {
         featureImportanceCard.style.display = 'none';
     }
@@ -679,6 +703,27 @@ function displayPlots(plots) {
     if (extraPlotsContainer) {
         extraPlotsContainer.innerHTML = ''; // 清空容器
         
+        // 添加特征重要性的可视化变体
+        if (plots.feature_importance_horizontal_bar) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_horizontal_bar, '特征重要性排序', 'bar-chart-steps');
+        }
+        
+        if (plots.feature_importance_vertical_bar) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_vertical_bar, '特征重要性条形图', 'bar-chart');
+        }
+        
+        if (plots.feature_importance_pie) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_pie, '特征重要性分布', 'pie-chart');
+        }
+        
+        if (plots.feature_importance_correlation) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_correlation, '重要特征相关性', 'grid-3x3');
+        }
+        
+        if (plots.feature_importance_cumulative) {
+            addExtraPlot(extraPlotsContainer, plots.feature_importance_cumulative, '特征重要性累积图', 'graph-up');
+        }
+        
         // 添加PR曲线
         if (plots.pr_curve) {
             addExtraPlot(extraPlotsContainer, plots.pr_curve, '精确率-召回率曲线', 'graph-up');
@@ -709,9 +754,26 @@ function displayPlots(plots) {
 function addExtraPlot(container, plotData, title, iconName) {
     const cardDiv = document.createElement('div');
     cardDiv.className = 'card';
+    
+    // 使用不同的图标 
+    let iconClass = 'graph-up';  // 默认图标
+    
+    // 根据标题或提供的图标名称选择合适的图标
+    if (title.includes('相关性') || iconName === 'grid-3x3') {
+        iconClass = 'grid-3x3';
+    } else if (title.includes('饼图') || title.includes('分布') || iconName === 'pie-chart') {
+        iconClass = 'pie-chart';
+    } else if (title.includes('条形图') || title.includes('直方图') || iconName === 'bar-chart') {
+        iconClass = 'bar-chart';
+    } else if (title.includes('排序') || iconName === 'bar-chart-steps') {
+        iconClass = 'bar-chart-steps';
+    } else if (title.includes('残差分布') || iconName === 'graph-down') {
+        iconClass = 'graph-down';
+    }
+    
     cardDiv.innerHTML = `
         <div class="section-title">
-            <i class="bi bi-${iconName}"></i>
+            <i class="bi bi-${iconClass}"></i>
             <h2>${title}</h2>
         </div>
         <div class="plot-container">
@@ -839,7 +901,7 @@ async function handlePredictWithImportedModelClick() {
     }
 
     if (!yColumn) {
-        showError('y-column-error', '请为新数据选择一个目标列用于评估');
+        showError('y-column-error', '请选择一个目标列用于评估');
         return;
     }
 
