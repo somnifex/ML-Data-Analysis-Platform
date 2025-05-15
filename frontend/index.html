@@ -268,11 +268,13 @@
         }
 
         .plot-container {
-            margin: 20px 0;
+            margin: 20px auto;
             border-radius: var(--border-radius-md);
             overflow: hidden;
             box-shadow: var(--shadow-sm);
             transition: transform 0.3s, box-shadow 0.3s;
+            max-width: 800px; /* 设置最大宽度以保持一致性 */
+            width: 100%;
         }
 
         .plot-container:hover {
@@ -684,48 +686,38 @@
                 </div>
             </div>
 
-            <div class="grid">
-                <div class="col-6">
-                    <div class="card">
-                        <div class="section-title">
-                            <i class="bi bi-activity"></i>
-                            <h2>学习曲线</h2>
-                        </div>
-                        <div class="plot-container">
-                            <img id="learning-curve-plot" class="plot-image" alt="学习曲线图">
-                        </div>
-                    </div>
+            <div class="card">
+                <div class="section-title">
+                    <i class="bi bi-activity"></i>
+                    <h2>学习曲线</h2>
                 </div>
-
-                <div class="col-6">
-                    <div class="card">
-                        <div class="section-title">
-                            <i class="bi bi-check-circle-fill"></i>
-                            <h2>预测结果</h2>
-                        </div>
-                        <div class="plot-container">
-                            <img id="prediction-plot" class="plot-image" alt="预测结果图">
-                        </div>
-                    </div>
+                <div class="plot-container">
+                    <img id="learning-curve-plot" class="plot-image" alt="学习曲线图">
                 </div>
             </div>
 
-            <div class="grid">
-                <div class="col-12">
-                    <div class="card" style="display:none;">
-                        <div class="section-title">
-                            <i class="bi bi-graph-up-arrow"></i>
-                            <h2>ROC曲线分析</h2>
-                        </div>
-                        <div class="plot-container">
-                            <img id="roc-curve-plot" class="plot-image" alt="ROC曲线图">
-                        </div>
-                    </div>
+            <div class="card">
+                <div class="section-title">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <h2>预测结果</h2>
+                </div>
+                <div class="plot-container">
+                    <img id="prediction-plot" class="plot-image" alt="预测结果图">
                 </div>
             </div>
 
-            <!-- 在结果区域的最后添加额外图表容器 -->
-            <div class="grid" id="extra-plots-container" style="display:none;">
+            <div class="card" style="display:none;" id="roc-curve-card">
+                <div class="section-title">
+                    <i class="bi bi-graph-up-arrow"></i>
+                    <h2>ROC曲线分析</h2>
+                </div>
+                <div class="plot-container">
+                    <img id="roc-curve-plot" class="plot-image" alt="ROC曲线图">
+                </div>
+            </div>
+
+            <!-- 额外图表容器 - 每个图表将单独在一行显示 -->
+            <div id="extra-plots-container" style="display:none;">
                 <!-- 额外的图表将会在这里动态添加 -->
             </div>
         </div>

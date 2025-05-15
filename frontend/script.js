@@ -614,9 +614,11 @@ function displayPlots(plots) {
     // 特征重要性图
     const featureImportancePlot = document.getElementById('feature-importance-plot');
     const featureImportanceCard = featureImportancePlot.closest('.card');
+    const featureImportanceTitle = featureImportanceCard.querySelector('h2');
 
     if (plots.feature_importance) {
         featureImportancePlot.src = `data:image/png;base64,${plots.feature_importance}`;
+        featureImportanceTitle.textContent = '特征重要性';
         featureImportanceCard.style.display = 'block';
     } else {
         featureImportanceCard.style.display = 'none';
@@ -625,16 +627,20 @@ function displayPlots(plots) {
     // 学习曲线图
     const learningCurvePlot = document.getElementById('learning-curve-plot');
     const learningCurveCard = learningCurvePlot.closest('.card');
+    const learningCurveTitle = learningCurveCard.querySelector('h2');
 
     let learningCurveSrc = null;
     if (plots.learning_curve) {
         learningCurveSrc = `data:image/png;base64,${plots.learning_curve}`;
+        learningCurveTitle.textContent = '学习曲线';
     } else if (plots.accuracy_curve) {
         learningCurveSrc = `data:image/png;base64,${plots.accuracy_curve}`;
+        learningCurveTitle.textContent = '准确率曲线';
     }
 
     if (learningCurveSrc) {
         learningCurvePlot.src = learningCurveSrc;
+        learningCurvePlot.alt = learningCurveTitle.textContent;
         learningCurveCard.style.display = 'block';
     } else {
         learningCurveCard.style.display = 'none';
@@ -650,12 +656,15 @@ function displayPlots(plots) {
     if (plots.roc_curve) {
         predictionPlotSrc = `data:image/png;base64,${plots.roc_curve}`;
         predictionTitle.textContent = 'ROC曲线';
+        predictionPlot.alt = 'ROC曲线图';
     } else if (plots.confusion_matrix) {
         predictionPlotSrc = `data:image/png;base64,${plots.confusion_matrix}`;
         predictionTitle.textContent = '混淆矩阵';
+        predictionPlot.alt = '混淆矩阵图';
     } else if (plots.prediction_vs_actual) {
         predictionPlotSrc = `data:image/png;base64,${plots.prediction_vs_actual}`;
-        predictionTitle.textContent = '预测结果';
+        predictionTitle.textContent = '预测值与实际值对比';
+        predictionPlot.alt = '预测值与实际值对比图';
     }
 
     if (predictionPlotSrc) {
@@ -665,7 +674,7 @@ function displayPlots(plots) {
         predictionCard.style.display = 'none';
     }
 
-    // 检查是否有PR曲线和残差图
+    // 检查是否有额外图表需要显示
     const extraPlotsContainer = document.getElementById('extra-plots-container');
     if (extraPlotsContainer) {
         extraPlotsContainer.innerHTML = ''; // 清空容器
@@ -677,17 +686,17 @@ function displayPlots(plots) {
         
         // 添加残差图
         if (plots.residuals_plot) {
-            addExtraPlot(extraPlotsContainer, plots.residuals_plot, '残差图', 'graph-down');
+            addExtraPlot(extraPlotsContainer, plots.residuals_plot, '残差分布图', 'graph-down');
         }
         
         // 添加残差分布图
         if (plots.residuals_hist) {
-            addExtraPlot(extraPlotsContainer, plots.residuals_hist, '残差分布', 'bar-chart');
+            addExtraPlot(extraPlotsContainer, plots.residuals_hist, '残差直方图', 'bar-chart');
         }
         
         // 如果有额外图表显示容器
         if (extraPlotsContainer.children.length > 0) {
-            extraPlotsContainer.style.display = 'grid';
+            extraPlotsContainer.style.display = 'block';
         } else {
             extraPlotsContainer.style.display = 'none';
         }
