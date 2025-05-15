@@ -552,14 +552,50 @@ function displayMetrics(metrics) {
         'precision': '精确率',
         'recall': '召回率',
         'f1': 'F1分数',
+        'auc': 'AUC值(ROC曲线下面积)',
+        'specificity': '特异性',
         'r2': 'R²决定系数',
         'mse': '均方误差(MSE)',
+        'rmse': '均方根误差(RMSE)',
         'mae': '平均绝对误差(MAE)'
     };
 
-    // 添加每个指标行
+    // 显示顺序
+    const displayOrder = [
+        'accuracy', 'precision', 'recall', 'f1', 'auc', 'specificity',
+        'r2', 'rmse', 'mse', 'mae'
+    ];
+
+    // 按显示顺序添加指标
+    displayOrder.forEach(key => {
+        if (metrics.hasOwnProperty(key)) {
+            const value = metrics[key];
+            const row = metricsTable.insertRow();
+            const nameCell = row.insertCell(0);
+            const valueCell = row.insertCell(1);
+
+            nameCell.textContent = metricNames[key] || key;
+            // 格式化数值（保留4位小数）
+            valueCell.textContent = typeof value === 'number' ? value.toFixed(4) : value;
+
+            // 为良好的指标值添加颜色
+            if ((key === 'accuracy' || key === 'precision' || key === 'recall' || key === 'f1' || key === 'auc' || key === 'r2') && value > 0.7) {
+                valueCell.style.color = 'var(--success-color)';
+                valueCell.style.fontWeight = 'bold';
+            } else if ((key === 'mse' || key === 'mae' || key === 'rmse') && value < 0.3) {
+                valueCell.style.color = 'var(--success-color)';
+                valueCell.style.fontWeight = 'bold';
+            } else if ((key === 'accuracy' || key === 'precision' || key === 'recall' || key === 'f1' || key === 'auc' || key === 'r2') && value < 0.5) {
+                valueCell.style.color = 'var(--danger-color)';
+                valueCell.style.fontWeight = 'bold';
+            }
+        }
+    });
+
+    // 添加其他未在显示顺序中的指标（如果有的话）
     for (const [key, value] of Object.entries(metrics)) {
         if (key === 'confusion_matrix') continue; // 混淆矩阵在图表中展示
+        if (displayOrder.includes(key)) continue; // 已经显示的指标跳过
 
         const row = metricsTable.insertRow();
         const nameCell = row.insertCell(0);
@@ -568,12 +604,6 @@ function displayMetrics(metrics) {
         nameCell.textContent = metricNames[key] || key;
         // 格式化数值（保留4位小数）
         valueCell.textContent = typeof value === 'number' ? value.toFixed(4) : value;
-
-        // 为良好的指标值添加颜色
-        if ((key === 'accuracy' || key === 'precision' || key === 'recall' || key === 'f1' || key === 'r2') && value > 0.7) {
-            valueCell.style.color = 'var(--success-color)';
-            valueCell.style.fontWeight = 'bold';
-        }
     }
 }
 
@@ -610,17 +640,22 @@ function displayPlots(plots) {
         learningCurveCard.style.display = 'none';
     }
 
-    // 预测结果图 (混淆矩阵, ROC, 或预测vs真实)
+    // 预测结果图 (优先级: ROC曲线 > 混淆矩阵 > 预测vs真实)
     const predictionPlot = document.getElementById('prediction-plot');
     const predictionCard = predictionPlot.closest('.card');
+    const predictionTitle = predictionCard.querySelector('h2');
 
     let predictionPlotSrc = null;
-    if (plots.confusion_matrix) {
-        predictionPlotSrc = `data:image/png;base64,${plots.confusion_matrix}`;
-    } else if (plots.roc_curve) {
+    
+    if (plots.roc_curve) {
         predictionPlotSrc = `data:image/png;base64,${plots.roc_curve}`;
+        predictionTitle.textContent = 'ROC曲线';
+    } else if (plots.confusion_matrix) {
+        predictionPlotSrc = `data:image/png;base64,${plots.confusion_matrix}`;
+        predictionTitle.textContent = '混淆矩阵';
     } else if (plots.prediction_vs_actual) {
         predictionPlotSrc = `data:image/png;base64,${plots.prediction_vs_actual}`;
+        predictionTitle.textContent = '预测结果';
     }
 
     if (predictionPlotSrc) {
@@ -629,6 +664,52 @@ function displayPlots(plots) {
     } else {
         predictionCard.style.display = 'none';
     }
+
+    // 检查是否有PR曲线和残差图
+    const extraPlotsContainer = document.getElementById('extra-plots-container');
+    if (extraPlotsContainer) {
+        extraPlotsContainer.innerHTML = ''; // 清空容器
+        
+        // 添加PR曲线
+        if (plots.pr_curve) {
+            addExtraPlot(extraPlotsContainer, plots.pr_curve, '精确率-召回率曲线', 'graph-up');
+        }
+        
+        // 添加残差图
+        if (plots.residuals_plot) {
+            addExtraPlot(extraPlotsContainer, plots.residuals_plot, '残差图', 'graph-down');
+        }
+        
+        // 添加残差分布图
+        if (plots.residuals_hist) {
+            addExtraPlot(extraPlotsContainer, plots.residuals_hist, '残差分布', 'bar-chart');
+        }
+        
+        // 如果有额外图表显示容器
+        if (extraPlotsContainer.children.length > 0) {
+            extraPlotsContainer.style.display = 'grid';
+        } else {
+            extraPlotsContainer.style.display = 'none';
+        }
+    }
+}
+
+/**
+ * 添加额外的图表到容器
+ */
+function addExtraPlot(container, plotData, title, iconName) {
+    const cardDiv = document.createElement('div');
+    cardDiv.className = 'card';
+    cardDiv.innerHTML = `
+        <div class="section-title">
+            <i class="bi bi-${iconName}"></i>
+            <h2>${title}</h2>
+        </div>
+        <div class="plot-container">
+            <img class="plot-image" src="data:image/png;base64,${plotData}" alt="${title}">
+        </div>
+    `;
+    container.appendChild(cardDiv);
 }
 
 /**

@@ -288,16 +288,14 @@ def get_model(model_name, input_size=None, is_classification_hint=None):
         pass
 
     if model_name == "nn_classifier":
-        net = NeuralClassifier(
-            input_size if input_size else 1
-        )
+        net = NeuralClassifier(input_size if input_size else 1)
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(net.parameters(), lr=0.001)
         model = PyTorchModel(net, criterion, optimizer, is_classification=True)
         return model, True
 
     elif model_name == "nn_regressor":
-        net = NeuralRegressor(input_size if input_size else 1) 
+        net = NeuralRegressor(input_size if input_size else 1)
         criterion = nn.MSELoss()
         optimizer = optim.Adam(net.parameters(), lr=0.001)
         model = PyTorchModel(net, criterion, optimizer, is_classification=False)
@@ -319,7 +317,7 @@ def get_model(model_name, input_size=None, is_classification_hint=None):
         model = SklearnModelWrapper(RandomForestRegressor(n_estimators=100))
         return model, False
 
-    # 支持向量机 - 分类
+    # 支持向量机 - 分类，确保启用概率输出
     elif model_name == "svm_classifier":
         model = SklearnModelWrapper(SVC(probability=True))
         return model, True

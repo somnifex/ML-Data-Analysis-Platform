@@ -18,7 +18,11 @@ from sklearn.metrics import (
     confusion_matrix,
     roc_curve,
     auc,
+    precision_recall_curve,
+    average_precision_score,
+    roc_auc_score,
 )
+from sklearn.preprocessing import label_binarize
 import torch
 from sklearn.inspection import permutation_importance
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -312,17 +316,106 @@ def evaluate_model(model, X_test, y_test, is_classification):
 
     if is_classification:
         metrics["accuracy"] = float(accuracy_score(y_test, y_pred))
+        
+        classes = np.unique(y_test)
+        n_classes = len(classes)
 
-        if len(np.unique(y_test)) == 2:
+        if n_classes == 2:  # 二分类情况
             metrics["precision"] = float(
                 precision_score(y_test, y_pred, zero_division=0)
             )
             metrics["recall"] = float(recall_score(y_test, y_pred, zero_division=0))
             metrics["f1"] = float(f1_score(y_test, y_pred, zero_division=0))
 
+            # 计算混淆矩阵以获取特异性
             cm = confusion_matrix(y_test, y_pred)
+            tn, fp, fn, tp = cm.ravel()
+            metrics["specificity"] = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
             metrics["confusion_matrix"] = cm.tolist()
-        else:
+
+            # 尝试多种方法获取分数用于ROC计算
+            y_scores = None
+            
+            # 方法1: 使用predict_proba (大多数scikit-learn模型)
+            if hasattr(model, "predict_proba"):
+                try:
+                    y_scores = model.predict_proba(X_test)[:, 1]
+                except Exception as e:
+                    print(f"使用predict_proba计算分数时出错: {e}")
+            
+            # 处理sklearn包装模型
+            elif hasattr(model, "model") and hasattr(model.model, "predict_proba"):
+                try:
+                    y_scores = model.model.predict_proba(X_test)[:, 1]
+                except Exception as e:
+                    print(f"使用model.predict_proba计算分数时出错: {e}")
+            
+            # 方法2: 使用decision_function (某些线性模型如SVM)
+            elif hasattr(model, "decision_function"):
+                try:
+                    y_scores = model.decision_function(X_test)
+                    # 如果返回的是多类决策分数，选择正类的分数
+                    if y_scores.ndim > 1:
+                        y_scores = y_scores[:, 1]
+                except Exception as e:
+                    print(f"使用decision_function计算分数时出错: {e}")
+            
+            # 处理sklearn包装模型
+            elif hasattr(model, "model") and hasattr(model.model, "decision_function"):
+                try:
+                    y_scores = model.model.decision_function(X_test)
+                    # 如果返回的是多类决策分数，选择正类的分数
+                    if y_scores.ndim > 1:
+                        y_scores = y_scores[:, 1]
+                except Exception as e:
+                    print(f"使用model.decision_function计算分数时出错: {e}")
+            
+            # 方法3: PyTorch模型
+            elif hasattr(model, "net") and hasattr(model, "device"):
+                try:
+                    X_tensor = torch.FloatTensor(X_test.values if hasattr(X_test, "values") else X_test).to(model.device)
+                    model.net.eval()
+                    with torch.no_grad():
+                        outputs = model.net(X_tensor)
+                        if outputs.shape[1] >= 2:  # 多分类
+                            y_scores = torch.softmax(outputs, 1).cpu().numpy()[:, 1]
+                        else:  # 二分类
+                            y_scores = torch.sigmoid(outputs).cpu().numpy().flatten()
+                except Exception as e:
+                    print(f"使用PyTorch模型计算分数时出错: {e}")
+            
+            # 方法4: 对于不支持上述方法的模型，使用预测结果作为代理分数
+            if y_scores is None:
+                print(f"警告：模型{type(model).__name__}不支持predict_proba或decision_function，将使用预测标签作为分数")
+                # 将类别标签转换为连续分数 (0或1) - 这是一个近似方法
+                try:
+                    y_scores = np.array(y_pred, dtype=float)
+                except:
+                    y_scores = np.array([1.0 if pred else 0.0 for pred in y_pred])
+            
+            # 如果成功获取分数，计算ROC/AUC
+            try:
+                fpr, tpr, _ = roc_curve(y_test, y_scores)
+                metrics["auc"] = float(auc(fpr, tpr))
+
+                # 保存ROC曲线数据点
+                metrics["roc_curve_data"] = {
+                    "fpr": fpr.tolist(),
+                    "tpr": tpr.tolist()
+                }
+
+                # 精确率-召回率曲线
+                precision, recall, _ = precision_recall_curve(y_test, y_scores)
+                metrics["average_precision"] = float(average_precision_score(y_test, y_scores))
+                metrics["pr_curve_data"] = {
+                    "precision": precision.tolist(),
+                    "recall": recall.tolist()
+                }
+            except Exception as e:
+                print(f"计算ROC/AUC时出错: {e}")
+                metrics["auc"] = 0.5  # 默认值 (随机猜测)
+                    
+        else:  # 多分类情况
             metrics["precision"] = float(
                 precision_score(y_test, y_pred, average="weighted", zero_division=0)
             )
@@ -332,9 +425,92 @@ def evaluate_model(model, X_test, y_test, is_classification):
             metrics["f1"] = float(
                 f1_score(y_test, y_pred, average="weighted", zero_division=0)
             )
+            
+            # 多分类ROC曲线和AUC计算 (一对多方式)
+            y_test_bin = label_binarize(y_test, classes=classes)
+            
+            # 为存储每个类的ROC曲线数据创建容器
+            all_fpr = {}
+            all_tpr = {}
+            all_auc = {}
+            
+            # 尝试获取多分类的分数
+            y_scores = None
+            
+            # 方法1: 使用predict_proba
+            if hasattr(model, "predict_proba"):
+                try:
+                    y_scores = model.predict_proba(X_test)
+                except Exception as e:
+                    print(f"获取多分类概率分数时出错: {e}")
+            
+            # 方法2: 使用decision_function
+            elif hasattr(model, "decision_function"):
+                try:
+                    decision_scores = model.decision_function(X_test)
+                    # 如果是二维数组，可以直接使用
+                    if decision_scores.ndim > 1:
+                        y_scores = decision_scores
+                    # 如果是一维数组，需要转换为OvR格式
+                    else:
+                        # 创建n_classes维度的零矩阵
+                        y_scores = np.zeros((len(y_test), n_classes))
+                        for i, score in enumerate(decision_scores):
+                            y_scores[i, 1] = score  # 假设score是正类的分数
+                except Exception as e:
+                    print(f"使用decision_function获取多分类分数时出错: {e}")
+            
+            # 方法3: PyTorch模型
+            elif hasattr(model, "net") and hasattr(model, "device"):
+                try:
+                    X_tensor = torch.FloatTensor(X_test.values if hasattr(X_test, "values") else X_test).to(model.device)
+                    model.net.eval()
+                    with torch.no_grad():
+                        outputs = model.net(X_tensor)
+                        y_scores = torch.softmax(outputs, 1).cpu().numpy()
+                except Exception as e:
+                    print(f"使用PyTorch模型获取多分类分数时出错: {e}")
+            
+            # 如果成功获取到分数，计算多分类AUC
+            if y_scores is not None:
+                try:
+                    # 计算宏平均ROC AUC
+                    try:
+                        metrics["auc"] = float(roc_auc_score(y_test_bin, y_scores, average="macro", multi_class="ovr"))
+                    except ValueError:
+                        # 如果有些类别在测试集中没有样本，可能会出错
+                        try:
+                            metrics["auc"] = float(roc_auc_score(y_test, y_scores, average="weighted", multi_class="ovr"))
+                        except:
+                            metrics["auc"] = float(roc_auc_score(y_test_bin, y_scores, average="macro", multi_class="ovr", labels=range(y_scores.shape[1])))
+                    
+                    # 计算每个类别的ROC曲线
+                    metrics["multi_class_roc_data"] = {}
+                    for i, class_name in enumerate(classes):
+                        if i < y_scores.shape[1]:  # 确保类索引在y_scores的范围内
+                            fpr, tpr, _ = roc_curve(
+                                y_test_bin[:, i] if y_test_bin.shape[1] > 1 else (y_test == class_name).astype(int), 
+                                y_scores[:, i]
+                            )
+                            roc_auc = auc(fpr, tpr)
+                            
+                            all_fpr[str(class_name)] = fpr.tolist()
+                            all_tpr[str(class_name)] = tpr.tolist()
+                            all_auc[str(class_name)] = float(roc_auc)
+                    
+                    metrics["multi_class_roc_data"] = {
+                        "fpr": all_fpr,
+                        "tpr": all_tpr,
+                        "auc": all_auc,
+                        "classes": [str(c) for c in classes]
+                    }
+                except Exception as e:
+                    print(f"计算多分类ROC曲线时出错: {e}")
     else:
         metrics["r2"] = float(r2_score(y_test, y_pred))
         metrics["mse"] = float(mean_squared_error(y_test, y_pred))
+        # 添加均方根误差(RMSE)
+        metrics["rmse"] = float(np.sqrt(mean_squared_error(y_test, y_pred)))
         metrics["mae"] = float(mean_absolute_error(y_test, y_pred))
 
     return metrics
@@ -381,6 +557,7 @@ def generate_plots(
         plt.ylabel("损失")
         plt.title("学习曲线")
         plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
         plots["learning_curve"] = fig_to_base64(plt.gcf())
         plt.close()
@@ -398,6 +575,7 @@ def generate_plots(
             plt.ylabel("准确率")
             plt.title("准确率曲线")
             plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.7)
             plt.tight_layout()
             plots["accuracy_curve"] = fig_to_base64(plt.gcf())
             plt.close()
@@ -413,6 +591,7 @@ def generate_plots(
             if hasattr(target_encoder, "classes_"):
                 tick_labels = target_encoder.classes_
 
+        # 美化混淆矩阵显示
         sns.heatmap(
             cm,
             annot=True,
@@ -420,6 +599,9 @@ def generate_plots(
             cmap="Blues",
             xticklabels=tick_labels if tick_labels is not None else "auto",
             yticklabels=tick_labels if tick_labels is not None else "auto",
+            cbar=True,
+            linewidths=0.5,
+            linecolor='gray',
         )
         plt.xlabel("预测类别")
         plt.ylabel("真实类别")
@@ -428,7 +610,51 @@ def generate_plots(
         plots["confusion_matrix"] = fig_to_base64(plt.gcf())
         plt.close()
 
-        if len(np.unique(y_test)) == 2:  # 仅二分类绘制ROC
+        # 多分类问题 ROC 曲线
+        classes = np.unique(y_test)
+        if len(classes) > 2:
+            metrics_data = evaluate_model(model, X_test, y_test, is_classification)
+            if "multi_class_roc_data" in metrics_data:
+                roc_data = metrics_data["multi_class_roc_data"]
+                
+                plt.figure(figsize=(10, 8))
+                colors = plt.cm.get_cmap('tab10', len(classes))
+                
+                for i, class_name in enumerate(roc_data["classes"]):
+                    if class_name in roc_data["fpr"] and class_name in roc_data["tpr"] and class_name in roc_data["auc"]:
+                        fpr = roc_data["fpr"][class_name]
+                        tpr = roc_data["tpr"][class_name]
+                        roc_auc = roc_data["auc"][class_name]
+                        
+                        # 获取类别名称（如果有预处理信息）
+                        display_name = class_name
+                        if preprocessing_info and "target_encoder" in preprocessing_info:
+                            try:
+                                idx = int(class_name)
+                                if idx < len(preprocessing_info["target_encoder"].classes_):
+                                    display_name = str(preprocessing_info["target_encoder"].classes_[idx])
+                            except (ValueError, IndexError):
+                                pass
+                        
+                        plt.plot(
+                            fpr, tpr, 
+                            color=colors(i), lw=2,
+                            label=f'类别 {display_name} (AUC = {roc_auc:.3f})'
+                        )
+                
+                plt.plot([0, 1], [0, 1], 'k--', lw=2)
+                plt.xlim([0.0, 1.0])
+                plt.ylim([0.0, 1.05])
+                plt.xlabel('假阳性率 (False Positive Rate)')
+                plt.ylabel('真阳性率 (True Positive Rate)')
+                plt.title('多分类ROC曲线 (一对多方法)')
+                plt.legend(loc="lower right", fontsize=9)
+                plt.grid(True, linestyle='--', alpha=0.7)
+                plt.tight_layout()
+                plots["roc_curve"] = fig_to_base64(plt.gcf())
+                plt.close()
+
+        elif len(np.unique(y_test)) == 2:  # 仅二分类绘制ROC
             y_probas = None
             if hasattr(model, "predict_proba"):
                 y_probas = model.predict_proba(X_test)[:, 1]
@@ -454,16 +680,36 @@ def generate_plots(
                     fpr, tpr, _ = roc_curve(y_test, y_probas)
                     roc_auc = auc(fpr, tpr)
 
+                    # 生成增强的ROC曲线
                     plt.figure(figsize=(8, 6))
-                    plt.plot(fpr, tpr, label=f"ROC曲线 (AUC = {roc_auc:.2f})")
-                    plt.plot([0, 1], [0, 1], "k--")
-                    plt.xlabel("假阳性率")
-                    plt.ylabel("真阳性率")
-                    plt.title("ROC曲线")
+                    plt.plot(fpr, tpr, label=f"ROC曲线 (AUC = {roc_auc:.3f})", color='#1f77b4', linewidth=2)
+                    plt.plot([0, 1], [0, 1], "k--", label="随机猜测", alpha=0.8)
+                    plt.xlim([0.0, 1.0])
+                    plt.ylim([0.0, 1.05])
+                    plt.xlabel("假阳性率 (1-特异性)")
+                    plt.ylabel("真阳性率 (敏感性/召回率)")
+                    plt.title("接收者操作特征(ROC)曲线")
                     plt.legend(loc="lower right")
+                    plt.grid(True, linestyle='--', alpha=0.7)
                     plt.tight_layout()
                     plots["roc_curve"] = fig_to_base64(plt.gcf())
                     plt.close()
+
+                    # 添加精确率-召回率曲线
+                    precision, recall, _ = precision_recall_curve(y_test, y_probas)
+                    avg_precision = average_precision_score(y_test, y_probas)
+                    
+                    plt.figure(figsize=(8, 6))
+                    plt.plot(recall, precision, label=f"PR曲线 (AP = {avg_precision:.3f})", color='#ff7f0e', linewidth=2)
+                    plt.xlabel("召回率")
+                    plt.ylabel("精确率")
+                    plt.title("精确率-召回率曲线")
+                    plt.legend(loc="lower left")
+                    plt.grid(True, linestyle='--', alpha=0.7)
+                    plt.tight_layout()
+                    plots["pr_curve"] = fig_to_base64(plt.gcf())
+                    plt.close()
+                    
                 except Exception as e:
                     print(f"生成ROC曲线时出错: {e}")
                     pass
@@ -474,10 +720,36 @@ def generate_plots(
         plt.xlabel("真实值")
         plt.ylabel("预测值")
         plt.title("预测 vs 真实值")
+        plt.grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
         plots["prediction_vs_actual"] = fig_to_base64(plt.gcf())
         plt.close()
 
+        # 添加残差图
+        residuals = y_test - y_pred
+        plt.figure(figsize=(8, 6))
+        plt.scatter(y_pred, residuals, alpha=0.5)
+        plt.axhline(y=0, color='r', linestyle='--')
+        plt.xlabel("预测值")
+        plt.ylabel("残差")
+        plt.title("残差图")
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plots["residuals_plot"] = fig_to_base64(plt.gcf())
+        plt.close()
+
+        # 添加残差分布直方图
+        plt.figure(figsize=(8, 6))
+        plt.hist(residuals, bins=30, alpha=0.7, color='skyblue', edgecolor='black')
+        plt.axvline(x=0, color='r', linestyle='--')
+        plt.xlabel("残差")
+        plt.ylabel("频率")
+        plt.title("残差分布")
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plots["residuals_hist"] = fig_to_base64(plt.gcf())
+        plt.close()
+        
     return plots
 
 
