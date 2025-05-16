@@ -107,7 +107,6 @@ def preprocess_data(df, x_columns, y_column, test_size=0.2, random_state=42):
                     encoded,
                     columns=[f"{col}_{cat}" for cat in encoder.categories_[0][1:]],
                 )
-
                 X = pd.concat([X, encoded_df], axis=1)
                 X.drop(columns=[col], inplace=True)
 
@@ -197,7 +196,6 @@ def apply_saved_preprocessing(
 
     encoded_features_info = saved_preprocessing_info.get("encoded_features", {})
     temp_encoded_dfs = []
-
     processed_categorical_cols = []
 
     for col in current_categorical_cols:
@@ -291,51 +289,65 @@ def calculate_feature_importance(X_train, y_train, feature_names, model_name):
     rf_model.fit(X_train, y_train)
 
     importances = rf_model.feature_importances_
-    
+
     # 计算标准差，用于误差条显示
-    if hasattr(rf_model, 'estimators_'):
-        std = np.std([tree.feature_importances_ for tree in rf_model.estimators_], axis=0)
+    if hasattr(rf_model, "estimators_"):
+        std = np.std(
+            [tree.feature_importances_ for tree in rf_model.estimators_], axis=0
+        )
     else:
         std = np.zeros_like(importances)
-    
+
     indices = np.argsort(importances)[::-1]
     sorted_features = [feature_names[i] for i in indices]
     sorted_importances = importances[indices]
     sorted_std = std[indices]
-    
+
     # 生成多种特征重要性可视化图
     visualizations = {}
-    
+
     # 1. 水平条形图 - 增强版本
     plt.figure(figsize=(10, 8))
     top_n = min(15, len(sorted_features))
-    plt.barh(range(top_n), sorted_importances[:top_n], align='center', 
-             color='skyblue', edgecolor='navy', alpha=0.8,
-             xerr=sorted_std[:top_n], capsize=5)
+    plt.barh(
+        range(top_n),
+        sorted_importances[:top_n],
+        align="center",
+        color="skyblue",
+        edgecolor="navy",
+        alpha=0.8,
+        xerr=sorted_std[:top_n],
+        capsize=5,
+    )
     plt.yticks(range(top_n), sorted_features[:top_n])
-    plt.xlabel('Importance Score')
-    plt.ylabel('Features')
-    plt.title('Feature Importance Ranking')
-    plt.grid(True, axis='x', linestyle='--', alpha=0.6)
+    plt.xlabel("Importance Score")
+    plt.ylabel("Features")
+    plt.title("Feature Importance Ranking")
+    plt.grid(True, axis="x", linestyle="--", alpha=0.6)
     plt.tight_layout()
-    visualizations['horizontal_bar'] = fig_to_base64(plt.gcf())
+    visualizations["horizontal_bar"] = fig_to_base64(plt.gcf())
     plt.close()
-    
+
     # 2. 垂直条形图 - 带颜色渐变
     plt.figure(figsize=(12, 8))
     top_n = min(15, len(sorted_features))
-    bars = plt.bar(range(top_n), sorted_importances[:top_n], 
-           yerr=sorted_std[:top_n], align='center', alpha=0.8,
-           color=plt.cm.viridis(np.linspace(0, 1, top_n)))
-    plt.xticks(range(top_n), sorted_features[:top_n], rotation=45, ha='right')
-    plt.ylabel('Importance Score')
-    plt.xlabel('Features')
-    plt.title('Top Features by Importance')
-    plt.grid(True, axis='y', linestyle='--', alpha=0.6)
+    bars = plt.bar(
+        range(top_n),
+        sorted_importances[:top_n],
+        yerr=sorted_std[:top_n],
+        align="center",
+        alpha=0.8,
+        color=plt.cm.viridis(np.linspace(0, 1, top_n)),
+    )
+    plt.xticks(range(top_n), sorted_features[:top_n], rotation=45, ha="right")
+    plt.ylabel("Importance Score")
+    plt.xlabel("Features")
+    plt.title("Top Features by Importance")
+    plt.grid(True, axis="y", linestyle="--", alpha=0.6)
     plt.tight_layout()
-    visualizations['vertical_bar'] = fig_to_base64(plt.gcf())
+    visualizations["vertical_bar"] = fig_to_base64(plt.gcf())
     plt.close()
-    
+
     # 3. 饼图 - 显示最重要的特征比例
     plt.figure(figsize=(10, 10))
     top_n = min(8, len(sorted_features))
@@ -344,32 +356,37 @@ def calculate_feature_importance(X_train, y_train, feature_names, model_name):
     # 添加其他类别
     if len(sorted_features) > top_n:
         pie_values = np.append(pie_values, sum(sorted_importances[top_n:]))
-        labels = sorted_features[:top_n] + ['Other Features']
+        labels = sorted_features[:top_n] + ["Other Features"]
     else:
         labels = sorted_features[:top_n]
-    
-    plt.pie(pie_values, labels=labels, autopct='%1.1f%%', 
-            shadow=True, startangle=90, 
-            colors=plt.cm.tab10(np.linspace(0, 1, len(pie_values))))
-    plt.axis('equal')  # 保持饼图为圆形
-    plt.title('Feature Importance Distribution')
+
+    plt.pie(
+        pie_values,
+        labels=labels,
+        autopct="%1.1f%%",
+        shadow=True,
+        startangle=90,
+        colors=plt.cm.tab10(np.linspace(0, 1, len(pie_values))),
+    )
+    plt.axis("equal")  # 保持饼图为圆形
+    plt.title("Feature Importance Distribution")
     plt.tight_layout()
-    visualizations['pie'] = fig_to_base64(plt.gcf())
+    visualizations["pie"] = fig_to_base64(plt.gcf())
     plt.close()
-    
+
     # 4. 热图 - 重要特征之间的相关性矩阵
     if len(sorted_features) > 2:
         plt.figure(figsize=(10, 8))
         top_n = min(12, len(sorted_features))
         top_features = [feature_names[i] for i in indices[:top_n]]
         X_top = X_train[top_features]
-        
+
         # 计算相关矩阵
         corr = X_top.corr()
-        
+
         # 检查是否有长特征名（超过15个字符）
         has_long_features = any(len(str(f)) > 20 for f in top_features)
-        
+
         if has_long_features:
             # 为特征创建简短的标识符
             short_labels = []
@@ -380,70 +397,107 @@ def calculate_feature_importance(X_train, y_train, feature_names, model_name):
                 else:
                     # 双字母 AA, AB, ...
                     short_labels.append(chr(65 + (i // 26) - 1) + chr(65 + (i % 26)))
-            
+
             # 创建映射字典
             label_mapping = dict(zip(top_features, short_labels))
-            
+
             # 重命名相关矩阵的索引和列名
             corr.index = [label_mapping[feat] for feat in corr.index]
             corr.columns = [label_mapping[feat] for feat in corr.columns]
-            
+
             # 创建一个足够大的图形，包含热力图和图例
-            fig = plt.figure(figsize=(14, 10))
-            
+            fig = plt.figure(figsize=(16, 10))
+
             # 在左侧创建热力图
-            ax1 = plt.subplot2grid((1, 5), (0, 0), colspan=3)
+            ax1 = plt.subplot2grid((1, 8), (0, 0), colspan=6)
             mask = np.triu(np.ones_like(corr, dtype=bool))
-            sns.heatmap(corr, mask=mask, cmap='coolwarm', vmax=1, vmin=-1, center=0,
-                        annot=True, fmt='.2f', square=True, linewidths=.5, ax=ax1)
-            ax1.set_title('特征相关性矩阵')
-            
+            sns.heatmap(
+                corr,
+                mask=mask,
+                cmap="coolwarm",
+                vmax=1,
+                vmin=-1,
+                center=0,
+                annot=True,
+                fmt=".2f",
+                square=True,
+                linewidths=0.5,
+                ax=ax1,
+                cbar_kws={
+                    "shrink": 1.1,
+                    "aspect": 20,
+                    "use_gridspec": False,
+                    "pad": 0.02,
+                },
+            )
+            ax1.set_title("Feature Correlation Matrix")
+
             # 在右侧添加图例
-            ax2 = plt.subplot2grid((1, 5), (0, 3), colspan=2)
-            ax2.axis('off')
-            legend_text = "Feature Identifier Mapping:\n\n"
+            ax2 = plt.subplot2grid((1, 8), (0, 7), colspan=2)
+            ax2.axis("off")
+            legend_text = "Feature Identifier Cross-Reference Table:\n\n"
             for feature, short_label in label_mapping.items():
-                if len(str(feature)) > 25:
-                    feature_display = str(feature)[:22] + "..."
+                if len(str(feature)) > 45:
+                    feature_display = str(feature)[:42] + "..."
                 else:
                     feature_display = str(feature)
                 legend_text += f"{short_label}: {feature_display}\n"
-            ax2.text(0, 0.5, legend_text, fontsize=10, va='center', ha='left')
+            ax2.text(0, 0.5, legend_text, fontsize=14, va="center", ha="left")
         else:
-            # 如果没有长特征名，使用原始的热力图代码
+            # 如果没有长特征名，使用原始的热力图代码个热力图
             mask = np.triu(np.ones_like(corr, dtype=bool))
-            sns.heatmap(corr, mask=mask, cmap='coolwarm', vmax=1, vmin=-1, center=0,
-                        annot=True, fmt='.2f', square=True, linewidths=.5)
-            plt.title('特征相关性矩阵')
-        
+            sns.heatmap(
+                corr,
+                mask=mask,
+                cmap="coolwarm",
+                vmax=1,
+                vmin=-1,
+                center=0,
+                annot=True,
+                fmt=".2f",
+                square=True,
+                linewidths=0.5,
+                # 这里也同样修改色条参数
+                cbar_kws={"shrink": 1, "aspect": 30, "pad": 0.05},
+            )
+            plt.title("Feature Correlation Matrix")
+
         plt.tight_layout()
-        visualizations['correlation'] = fig_to_base64(plt.gcf())
+        visualizations["correlation"] = fig_to_base64(plt.gcf())
         plt.close()
-    
+
     # 5. 累积重要性图
     plt.figure(figsize=(10, 6))
     cumulative_importance = np.cumsum(sorted_importances)
-    plt.plot(range(1, len(sorted_features) + 1), cumulative_importance, 
-             marker='o', linestyle='-', color='#1f77b4', markersize=5)
-    
+    plt.plot(
+        range(1, len(sorted_features) + 1),
+        cumulative_importance,
+        marker="o",
+        linestyle="-",
+        color="#1f77b4",
+        markersize=5,
+    )
+
     # 添加90%和95%重要性的参考线
-    plt.axhline(y=0.9, color='r', linestyle='--', label='90% Importance')
-    plt.axhline(y=0.95, color='g', linestyle='--', label='95% Importance')
-    
+    plt.axhline(y=0.9, color="r", linestyle="--", label="90% Importance")
+    plt.axhline(y=0.95, color="g", linestyle="--", label="95% Importance")
+
     # 找到达到90%和95%重要性所需的特征数量
     features_90 = np.where(cumulative_importance >= 0.9)[0][0] + 1
     features_95 = np.where(cumulative_importance >= 0.95)[0][0] + 1
-    
-    plt.axvline(x=features_90, color='r', linestyle=':', alpha=0.7)
-    plt.axvline(x=features_95, color='g', linestyle=':', alpha=0.7)
-    
-    plt.xlabel('Number of Features')
-    plt.ylabel('Cumulative Importance')
-    plt.title(f'Cumulative Feature Importance\n(90% at {features_90} features, 95% at {features_95} features)')
-    plt.grid(True, linestyle='--', alpha=0.7)
+
+    plt.axvline(x=features_90, color="r", linestyle=":", alpha=0.7)
+    plt.axvline(x=features_95, color="g", linestyle=":", alpha=0.7)
+
+    plt.xlabel("Number of Features")
+    plt.ylabel("Cumulative Importance")
+    plt.title(
+        f"Cumulative Feature Importance\n(90% at {features_90} features, 95% at {features_95} features)"
+    )
+    plt.grid(True, linestyle="--", alpha=0.7)
     plt.legend()
     plt.tight_layout()
-    visualizations['cumulative'] = fig_to_base64(plt.gcf())
+    visualizations["cumulative"] = fig_to_base64(plt.gcf())
     plt.close()
 
     return {
@@ -451,7 +505,7 @@ def calculate_feature_importance(X_train, y_train, feature_names, model_name):
         "importance_values": sorted_importances.tolist(),
         "std_values": sorted_std.tolist(),
         "model_used": "random_forest",
-        "visualizations": visualizations
+        "visualizations": visualizations,
     }
 
 
@@ -468,60 +522,94 @@ def evaluate_model(model, X_test, y_test, is_classification):
 
     if is_classification:
         metrics["accuracy"] = float(accuracy_score(y_test, y_pred))
-        
+
         classes = np.unique(y_test)
         n_classes = len(classes)
-        
+
         # 检测类别不平衡
         class_counts = np.bincount(y_test.astype(int))
         class_distribution = class_counts / class_counts.sum()
         metrics["class_distribution"] = class_distribution.tolist()
-        
+
         # 检查是否严重不平衡（任一类别占比低于10%）
         imbalance_detected = any(dist < 0.1 for dist in class_distribution)
         metrics["class_imbalance_detected"] = imbalance_detected
-        
+
         if n_classes == 2:
             # 二分类指标 - 使用多种平均方式
-            metrics["precision"] = float(precision_score(y_test, y_pred, zero_division=0))
+            metrics["precision"] = float(
+                precision_score(y_test, y_pred, zero_division=0)
+            )
             metrics["recall"] = float(recall_score(y_test, y_pred, zero_division=0))
             metrics["f1"] = float(f1_score(y_test, y_pred, zero_division=0))
-            
+
             # 为每个类别添加单独的指标
             metrics["per_class_metrics"] = {}
             for i, class_label in enumerate(classes):
                 metrics["per_class_metrics"][str(class_label)] = {
-                    "precision": float(precision_score(y_test, y_pred, pos_label=class_label, average="binary", zero_division=0)),
-                    "recall": float(recall_score(y_test, y_pred, pos_label=class_label, average="binary", zero_division=0)),
-                    "f1": float(f1_score(y_test, y_pred, pos_label=class_label, average="binary", zero_division=0)),
-                    "support": int(np.sum(y_test == class_label))
+                    "precision": float(
+                        precision_score(
+                            y_test,
+                            y_pred,
+                            pos_label=class_label,
+                            average="binary",
+                            zero_division=0,
+                        )
+                    ),
+                    "recall": float(
+                        recall_score(
+                            y_test,
+                            y_pred,
+                            pos_label=class_label,
+                            average="binary",
+                            zero_division=0,
+                        )
+                    ),
+                    "f1": float(
+                        f1_score(
+                            y_test,
+                            y_pred,
+                            pos_label=class_label,
+                            average="binary",
+                            zero_division=0,
+                        )
+                    ),
+                    "support": int(np.sum(y_test == class_label)),
                 }
 
             cm = confusion_matrix(y_test, y_pred)
             tn, fp, fn, tp = cm.ravel()
             metrics["specificity"] = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
             metrics["confusion_matrix"] = cm.tolist()
-            
+
             # 添加困惑矩阵衍生指标
-            metrics["balanced_accuracy"] = float((tp/(tp+fn) + tn/(tn+fp))/2) if (tp+fn)*(tn+fp) > 0 else 0.0
-            metrics["false_positive_rate"] = float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0
-            metrics["false_negative_rate"] = float(fn / (fn + tp)) if (fn + tp) > 0 else 0.0
+            metrics["balanced_accuracy"] = (
+                float((tp / (tp + fn) + tn / (tn + fp)) / 2)
+                if (tp + fn) * (tn + fp) > 0
+                else 0.0
+            )
+            metrics["false_positive_rate"] = (
+                float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0
+            )
+            metrics["false_negative_rate"] = (
+                float(fn / (fn + tp)) if (fn + tp) > 0 else 0.0
+            )
 
             # 计算 ROC 曲线相关指标
             y_scores = None
-            
+
             if hasattr(model, "predict_proba"):
                 try:
                     y_scores = model.predict_proba(X_test)[:, 1]
                 except Exception as e:
                     print(f"使用predict_proba计算分数时出错: {e}")
-            
+
             elif hasattr(model, "model") and hasattr(model.model, "predict_proba"):
                 try:
                     y_scores = model.model.predict_proba(X_test)[:, 1]
                 except Exception as e:
                     print(f"使用model.predict_proba计算分数时出错: {e}")
-            
+
             elif hasattr(model, "decision_function"):
                 try:
                     y_scores = model.decision_function(X_test)
@@ -529,7 +617,7 @@ def evaluate_model(model, X_test, y_test, is_classification):
                         y_scores = y_scores[:, 1]
                 except Exception as e:
                     print(f"使用decision_function计算分数时出错: {e}")
-            
+
             elif hasattr(model, "model") and hasattr(model.model, "decision_function"):
                 try:
                     y_scores = model.model.decision_function(X_test)
@@ -537,10 +625,12 @@ def evaluate_model(model, X_test, y_test, is_classification):
                         y_scores = y_scores[:, 1]
                 except Exception as e:
                     print(f"使用model.decision_function计算分数时出错: {e}")
-            
+
             elif hasattr(model, "net") and hasattr(model, "device"):
                 try:
-                    X_tensor = torch.FloatTensor(X_test.values if hasattr(X_test, "values") else X_test).to(model.device)
+                    X_tensor = torch.FloatTensor(
+                        X_test.values if hasattr(X_test, "values") else X_test
+                    ).to(model.device)
                     model.net.eval()
                     with torch.no_grad():
                         outputs = model.net(X_tensor)
@@ -550,33 +640,34 @@ def evaluate_model(model, X_test, y_test, is_classification):
                             y_scores = torch.sigmoid(outputs).cpu().numpy().flatten()
                 except Exception as e:
                     print(f"使用PyTorch模型计算分数时出错: {e}")
-            
+
             if y_scores is None:
-                print(f"警告：模型{type(model).__name__}不支持predict_proba或decision_function，将使用预测标签作为分数")
+                print(
+                    f"警告：模型{type(model).__name__}不支持predict_proba或decision_function，将使用预测标签作为分数"
+                )
                 try:
                     y_scores = np.array(y_pred, dtype=float)
                 except:
                     y_scores = np.array([1.0 if pred else 0.0 for pred in y_pred])
-            
+
             try:
                 fpr, tpr, _ = roc_curve(y_test, y_scores)
                 metrics["auc"] = float(auc(fpr, tpr))
 
-                metrics["roc_curve_data"] = {
-                    "fpr": fpr.tolist(),
-                    "tpr": tpr.tolist()
-                }
+                metrics["roc_curve_data"] = {"fpr": fpr.tolist(), "tpr": tpr.tolist()}
 
                 precision, recall, _ = precision_recall_curve(y_test, y_scores)
-                metrics["average_precision"] = float(average_precision_score(y_test, y_scores))
+                metrics["average_precision"] = float(
+                    average_precision_score(y_test, y_scores)
+                )
                 metrics["pr_curve_data"] = {
                     "precision": precision.tolist(),
-                    "recall": recall.tolist()
+                    "recall": recall.tolist(),
                 }
             except Exception as e:
                 print(f"计算ROC/AUC时出错: {e}")
                 metrics["auc"] = 0.5
-                    
+
         else:
             # 多分类指标 - 使用多种平均方式
             metrics["precision_weighted"] = float(
@@ -588,7 +679,7 @@ def evaluate_model(model, X_test, y_test, is_classification):
             metrics["precision_micro"] = float(
                 precision_score(y_test, y_pred, average="micro", zero_division=0)
             )
-            
+
             metrics["recall_weighted"] = float(
                 recall_score(y_test, y_pred, average="weighted", zero_division=0)
             )
@@ -598,7 +689,7 @@ def evaluate_model(model, X_test, y_test, is_classification):
             metrics["recall_micro"] = float(
                 recall_score(y_test, y_pred, average="micro", zero_division=0)
             )
-            
+
             metrics["f1_weighted"] = float(
                 f1_score(y_test, y_pred, average="weighted", zero_division=0)
             )
@@ -608,39 +699,45 @@ def evaluate_model(model, X_test, y_test, is_classification):
             metrics["f1_micro"] = float(
                 f1_score(y_test, y_pred, average="micro", zero_division=0)
             )
-            
+
             # 兼容旧版本API
             metrics["precision"] = metrics["precision_weighted"]
-            metrics["recall"] = metrics["recall_weighted"] 
+            metrics["recall"] = metrics["recall_weighted"]
             metrics["f1"] = metrics["f1_weighted"]
-            
+
             # 为每个类别添加单独的指标
             metrics["per_class_metrics"] = {}
             for i, class_label in enumerate(classes):
                 y_true_binary = (y_test == class_label).astype(int)
                 y_pred_binary = (y_pred == class_label).astype(int)
                 metrics["per_class_metrics"][str(class_label)] = {
-                    "precision": float(precision_score(y_true_binary, y_pred_binary, zero_division=0)),
-                    "recall": float(recall_score(y_true_binary, y_pred_binary, zero_division=0)),
-                    "f1": float(f1_score(y_true_binary, y_pred_binary, zero_division=0)),
-                    "support": int(np.sum(y_test == class_label))
+                    "precision": float(
+                        precision_score(y_true_binary, y_pred_binary, zero_division=0)
+                    ),
+                    "recall": float(
+                        recall_score(y_true_binary, y_pred_binary, zero_division=0)
+                    ),
+                    "f1": float(
+                        f1_score(y_true_binary, y_pred_binary, zero_division=0)
+                    ),
+                    "support": int(np.sum(y_test == class_label)),
                 }
-            
+
             # 计算多分类ROC曲线和AUC
             y_test_bin = label_binarize(y_test, classes=classes)
-            
+
             all_fpr = {}
             all_tpr = {}
             all_auc = {}
-            
+
             y_scores = None
-            
+
             if hasattr(model, "predict_proba"):
                 try:
                     y_scores = model.predict_proba(X_test)
                 except Exception as e:
                     print(f"获取多分类概率分数时出错: {e}")
-            
+
             elif hasattr(model, "decision_function"):
                 try:
                     decision_scores = model.decision_function(X_test)
@@ -652,45 +749,70 @@ def evaluate_model(model, X_test, y_test, is_classification):
                             y_scores[i, 1] = score
                 except Exception as e:
                     print(f"使用decision_function获取多分类分数时出错: {e}")
-            
+
             elif hasattr(model, "net") and hasattr(model, "device"):
                 try:
-                    X_tensor = torch.FloatTensor(X_test.values if hasattr(X_test, "values") else X_test).to(model.device)
+                    X_tensor = torch.FloatTensor(
+                        X_test.values if hasattr(X_test, "values") else X_test
+                    ).to(model.device)
                     model.net.eval()
                     with torch.no_grad():
                         outputs = model.net(X_tensor)
                         y_scores = torch.softmax(outputs, 1).cpu().numpy()
                 except Exception as e:
                     print(f"使用PyTorch模型获取多分类分数时出错: {e}")
-            
+
             if y_scores is not None:
                 try:
                     try:
-                        metrics["auc"] = float(roc_auc_score(y_test_bin, y_scores, average="macro", multi_class="ovr"))
+                        metrics["auc"] = float(
+                            roc_auc_score(
+                                y_test_bin, y_scores, average="macro", multi_class="ovr"
+                            )
+                        )
                     except ValueError:
                         try:
-                            metrics["auc"] = float(roc_auc_score(y_test, y_scores, average="weighted", multi_class="ovr"))
+                            metrics["auc"] = float(
+                                roc_auc_score(
+                                    y_test,
+                                    y_scores,
+                                    average="weighted",
+                                    multi_class="ovr",
+                                )
+                            )
                         except:
-                            metrics["auc"] = float(roc_auc_score(y_test_bin, y_scores, average="macro", multi_class="ovr", labels=range(y_scores.shape[1])))
-                    
+                            metrics["auc"] = float(
+                                roc_auc_score(
+                                    y_test_bin,
+                                    y_scores,
+                                    average="macro",
+                                    multi_class="ovr",
+                                    labels=range(y_scores.shape[1]),
+                                )
+                            )
+
                     metrics["multi_class_roc_data"] = {}
                     for i, class_name in enumerate(classes):
                         if i < y_scores.shape[1]:
                             fpr, tpr, _ = roc_curve(
-                                y_test_bin[:, i] if y_test_bin.shape[1] > 1 else (y_test == class_name).astype(int), 
-                                y_scores[:, i]
+                                (
+                                    y_test_bin[:, i]
+                                    if y_test_bin.shape[1] > 1
+                                    else (y_test == class_name).astype(int)
+                                ),
+                                y_scores[:, i],
                             )
                             roc_auc = auc(fpr, tpr)
-                            
+
                             all_fpr[str(class_name)] = fpr.tolist()
                             all_tpr[str(class_name)] = tpr.tolist()
                             all_auc[str(class_name)] = float(roc_auc)
-                    
+
                     metrics["multi_class_roc_data"] = {
                         "fpr": all_fpr,
                         "tpr": all_tpr,
                         "auc": all_auc,
-                        "classes": [str(c) for c in classes]
+                        "classes": [str(c) for c in classes],
                     }
                 except Exception as e:
                     print(f"计算多分类ROC曲线时出错: {e}")
@@ -700,68 +822,75 @@ def evaluate_model(model, X_test, y_test, is_classification):
         metrics["mse"] = float(mean_squared_error(y_test, y_pred))
         metrics["rmse"] = float(np.sqrt(mean_squared_error(y_test, y_pred)))
         metrics["mae"] = float(mean_absolute_error(y_test, y_pred))
-        
+
         # 为回归模型添加基于多阈值的分类指标
         thresholds = {
             "median": np.median(y_test),
             "mean": np.mean(y_test),
             "q1": np.percentile(y_test, 25),
-            "q3": np.percentile(y_test, 75)
+            "q3": np.percentile(y_test, 75),
         }
-        
+
         metrics["binary_classification_metrics"] = {}
-        
+
         for threshold_name, threshold in thresholds.items():
             # 转换真实值和预测值为二分类
             y_test_binary = (y_test > threshold).astype(int)
             y_pred_binary = (y_pred > threshold).astype(int)
-            
+
             # 计算分类指标
             threshold_metrics = {
                 "threshold_value": float(threshold),
                 "accuracy": float(accuracy_score(y_test_binary, y_pred_binary)),
-                "precision": float(precision_score(y_test_binary, y_pred_binary, zero_division=0)),
-                "recall": float(recall_score(y_test_binary, y_pred_binary, zero_division=0)),
+                "precision": float(
+                    precision_score(y_test_binary, y_pred_binary, zero_division=0)
+                ),
+                "recall": float(
+                    recall_score(y_test_binary, y_pred_binary, zero_division=0)
+                ),
                 "f1": float(f1_score(y_test_binary, y_pred_binary, zero_division=0)),
                 "support_above_threshold": int(np.sum(y_test_binary)),
-                "support_below_threshold": int(np.sum(1 - y_test_binary))
+                "support_below_threshold": int(np.sum(1 - y_test_binary)),
             }
-            
+
             metrics["binary_classification_metrics"][threshold_name] = threshold_metrics
-        
+
         # 使用中位数阈值作为默认分类指标（保持向后兼容）
-        metrics["accuracy"] = metrics["binary_classification_metrics"]["median"]["accuracy"]
-        metrics["precision"] = metrics["binary_classification_metrics"]["median"]["precision"]
+        metrics["accuracy"] = metrics["binary_classification_metrics"]["median"][
+            "accuracy"
+        ]
+        metrics["precision"] = metrics["binary_classification_metrics"]["median"][
+            "precision"
+        ]
         metrics["recall"] = metrics["binary_classification_metrics"]["median"]["recall"]
         metrics["f1"] = metrics["binary_classification_metrics"]["median"]["f1"]
         metrics["threshold_used"] = float(thresholds["median"])
-        
+
         # 计算混淆矩阵以获取特异性
         cm = confusion_matrix(y_test_binary, y_pred_binary)
         tn, fp, fn, tp = cm.ravel()
         metrics["specificity"] = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
         metrics["confusion_matrix"] = cm.tolist()
-        
+
         # 添加阈值信息
         metrics["threshold_used"] = float(threshold)
-        
+
         # 计算ROC曲线和AUC
         try:
             # 对连续值预测使用ROC
             fpr, tpr, _ = roc_curve(y_test_binary, y_pred)
             metrics["auc"] = float(auc(fpr, tpr))
-            
-            metrics["roc_curve_data"] = {
-                "fpr": fpr.tolist(),
-                "tpr": tpr.tolist()
-            }
-            
+
+            metrics["roc_curve_data"] = {"fpr": fpr.tolist(), "tpr": tpr.tolist()}
+
             # 精确率-召回率曲线
             precision, recall, _ = precision_recall_curve(y_test_binary, y_pred)
-            metrics["average_precision"] = float(average_precision_score(y_test_binary, y_pred))
+            metrics["average_precision"] = float(
+                average_precision_score(y_test_binary, y_pred)
+            )
             metrics["pr_curve_data"] = {
                 "precision": precision.tolist(),
-                "recall": recall.tolist()
+                "recall": recall.tolist(),
             }
         except Exception as e:
             print(f"计算回归模型ROC/AUC时出错: {e}")
@@ -795,7 +924,7 @@ def generate_plots(
             # 直接从原始数据中添加可视化
             for viz_name, viz_data in importance_data["visualizations"].items():
                 plots[f"feature_importance_{viz_name}"] = viz_data
-                
+
         # 生成标准的特征重要性图
         plt.figure(figsize=(10, 6))
         num_features = min(10, len(importance_data["feature_names"]))
@@ -819,7 +948,7 @@ def generate_plots(
         plt.ylabel("Loss")
         plt.title("Learning Curve")
         plt.legend()
-        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.grid(True, linestyle="--", alpha=0.7)
         plt.tight_layout()
         plots["learning_curve"] = fig_to_base64(plt.gcf())
         plt.close()
@@ -837,13 +966,13 @@ def generate_plots(
             plt.ylabel("Accuracy")
             plt.title("Accuracy Curve")
             plt.legend()
-            plt.grid(True, linestyle='--', alpha=0.7)
+            plt.grid(True, linestyle="--", alpha=0.7)
             plt.tight_layout()
             plots["accuracy_curve"] = fig_to_base64(plt.gcf())
             plt.close()
 
     y_pred = model.predict(X_test)
-    
+
     # 确保 y_pred 是一维数组，与 y_test 兼容
     if isinstance(y_pred, np.ndarray) and y_pred.ndim > 1:
         if y_pred.shape[1] == 1:
@@ -872,7 +1001,7 @@ def generate_plots(
             yticklabels=tick_labels if tick_labels is not None else "auto",
             cbar=True,
             linewidths=0.5,
-            linecolor='gray',
+            linecolor="gray",
         )
         plt.xlabel("Predicted Labels")
         plt.ylabel("True Labels")
@@ -886,39 +1015,54 @@ def generate_plots(
             metrics_data = evaluate_model(model, X_test, y_test, is_classification)
             if "multi_class_roc_data" in metrics_data:
                 roc_data = metrics_data["multi_class_roc_data"]
-                
+
                 plt.figure(figsize=(10, 8))
-                colors = plt.cm.get_cmap('tab10', len(classes))
-                
+                colors = plt.cm.get_cmap("tab10", len(classes))
+
                 for i, class_name in enumerate(roc_data["classes"]):
-                    if class_name in roc_data["fpr"] and class_name in roc_data["tpr"] and class_name in roc_data["auc"]:
+                    if (
+                        class_name in roc_data["fpr"]
+                        and class_name in roc_data["tpr"]
+                        and class_name in roc_data["auc"]
+                    ):
                         fpr = roc_data["fpr"][class_name]
                         tpr = roc_data["tpr"][class_name]
                         roc_auc = roc_data["auc"][class_name]
-                        
+
                         display_name = class_name
-                        if preprocessing_info and "target_encoder" in preprocessing_info:
+                        if (
+                            preprocessing_info
+                            and "target_encoder" in preprocessing_info
+                        ):
                             try:
                                 idx = int(class_name)
-                                if idx < len(preprocessing_info["target_encoder"].classes_):
-                                    display_name = str(preprocessing_info["target_encoder"].classes_[idx])
+                                if idx < len(
+                                    preprocessing_info["target_encoder"].classes_
+                                ):
+                                    display_name = str(
+                                        preprocessing_info["target_encoder"].classes_[
+                                            idx
+                                        ]
+                                    )
                             except (ValueError, IndexError):
                                 pass
-                        
+
                         plt.plot(
-                            fpr, tpr, 
-                            color=colors(i), lw=2,
-                            label=f'Class {display_name} (AUC = {roc_auc:.3f})'
+                            fpr,
+                            tpr,
+                            color=colors(i),
+                            lw=2,
+                            label=f"Class {display_name} (AUC = {roc_auc:.3f})",
                         )
-                
-                plt.plot([0, 1], [0, 1], 'k--', lw=2)
+
+                plt.plot([0, 1], [0, 1], "k--", lw=2)
                 plt.xlim([0.0, 1.0])
                 plt.ylim([0.0, 1.05])
-                plt.xlabel('False Positive Rate')
-                plt.ylabel('True Positive Rate')
-                plt.title('Multi-class ROC Curves (One-vs-Rest)')
+                plt.xlabel("False Positive Rate")
+                plt.ylabel("True Positive Rate")
+                plt.title("Multi-class ROC Curves (One-vs-Rest)")
                 plt.legend(loc="lower right", fontsize=9)
-                plt.grid(True, linestyle='--', alpha=0.7)
+                plt.grid(True, linestyle="--", alpha=0.7)
                 plt.tight_layout()
                 plots["roc_curve"] = fig_to_base64(plt.gcf())
                 plt.close()
@@ -950,7 +1094,13 @@ def generate_plots(
                     roc_auc = auc(fpr, tpr)
 
                     plt.figure(figsize=(8, 6))
-                    plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {roc_auc:.3f})", color='#1f77b4', linewidth=2)
+                    plt.plot(
+                        fpr,
+                        tpr,
+                        label=f"ROC Curve (AUC = {roc_auc:.3f})",
+                        color="#1f77b4",
+                        linewidth=2,
+                    )
                     plt.plot([0, 1], [0, 1], "k--", label="Random Guess", alpha=0.8)
                     plt.xlim([0.0, 1.0])
                     plt.ylim([0.0, 1.05])
@@ -958,25 +1108,31 @@ def generate_plots(
                     plt.ylabel("True Positive Rate (Sensitivity/Recall)")
                     plt.title("Receiver Operating Characteristic (ROC) Curve")
                     plt.legend(loc="lower right")
-                    plt.grid(True, linestyle='--', alpha=0.7)
+                    plt.grid(True, linestyle="--", alpha=0.7)
                     plt.tight_layout()
                     plots["roc_curve"] = fig_to_base64(plt.gcf())
                     plt.close()
 
                     precision, recall, _ = precision_recall_curve(y_test, y_probas)
                     avg_precision = average_precision_score(y_test, y_probas)
-                    
+
                     plt.figure(figsize=(8, 6))
-                    plt.plot(recall, precision, label=f"PR Curve (AP = {avg_precision:.3f})", color='#ff7f0e', linewidth=2)
+                    plt.plot(
+                        recall,
+                        precision,
+                        label=f"PR Curve (AP = {avg_precision:.3f})",
+                        color="#ff7f0e",
+                        linewidth=2,
+                    )
                     plt.xlabel("Recall")
                     plt.ylabel("Precision")
                     plt.title("Precision-Recall Curve")
                     plt.legend(loc="lower left")
-                    plt.grid(True, linestyle='--', alpha=0.7)
+                    plt.grid(True, linestyle="--", alpha=0.7)
                     plt.tight_layout()
                     plots["pr_curve"] = fig_to_base64(plt.gcf())
                     plt.close()
-                    
+
                 except Exception as e:
                     print(f"生成ROC曲线时出错: {e}")
                     pass
@@ -987,7 +1143,7 @@ def generate_plots(
         plt.xlabel("Actual Values")
         plt.ylabel("Predicted Values")
         plt.title("Predicted vs Actual Values")
-        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.grid(True, linestyle="--", alpha=0.7)
         plt.tight_layout()
         plots["prediction_vs_actual"] = fig_to_base64(plt.gcf())
         plt.close()
@@ -997,43 +1153,43 @@ def generate_plots(
             y_test_values = y_test.values
         else:
             y_test_values = y_test
-            
+
         if y_test_values.ndim > 1:
             y_test_values = y_test_values.flatten()
-            
+
         if isinstance(y_pred, pd.Series):
             y_pred_values = y_pred.values
         else:
             y_pred_values = y_pred
-            
+
         if y_pred_values.ndim > 1:
             y_pred_values = y_pred_values.flatten()
-            
+
         # 计算残差
         residuals = y_test_values - y_pred_values
-        
+
         plt.figure(figsize=(8, 6))
         plt.scatter(y_pred_values, residuals, alpha=0.5)
-        plt.axhline(y=0, color='r', linestyle='--')
+        plt.axhline(y=0, color="r", linestyle="--")
         plt.xlabel("Predicted Values")
         plt.ylabel("Residuals")
         plt.title("Residual Plot")
-        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.grid(True, linestyle="--", alpha=0.7)
         plt.tight_layout()
         plots["residuals_plot"] = fig_to_base64(plt.gcf())
         plt.close()
 
         plt.figure(figsize=(8, 6))
-        plt.hist(residuals, bins=30, alpha=0.7, color='skyblue', edgecolor='black')
-        plt.axvline(x=0, color='r', linestyle='--')
+        plt.hist(residuals, bins=30, alpha=0.7, color="skyblue", edgecolor="black")
+        plt.axvline(x=0, color="r", linestyle="--")
         plt.xlabel("Residuals")
         plt.ylabel("Frequency")
         plt.title("Residuals Distribution")
-        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.grid(True, linestyle="--", alpha=0.7)
         plt.tight_layout()
         plots["residuals_hist"] = fig_to_base64(plt.gcf())
         plt.close()
-        
+
     return plots
 
 

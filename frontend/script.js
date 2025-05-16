@@ -1,12 +1,8 @@
 const API_BASE_URL = 'http://localhost:19123';
 
-// 保存文件中的列名
 let fileColumns = [];
-// 保存已选择的特征列
 let xColumns = [];
-// 保存选择的目标列
 let yColumn = '';
-// 当前是否有导入的模型
 let isModelImported = false;
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -17,12 +13,10 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('import-model-file').addEventListener('change', handleImportModelFileChange);
     document.getElementById('predict-imported-button').addEventListener('click', handlePredictWithImportedModelClick);
 
-    // 添加模型选择变化监听
     document.getElementById('model').addEventListener('change', function () {
         if (this.value) {
             updateStepIndicator(2);
             
-            // 检查是否为神经网络模型，如果是则显示训练参数
             const modelValue = this.value;
             const trainingParamsDiv = document.getElementById('training-params');
             if (modelValue.includes('nn_') || modelValue.includes('emax_')) {
@@ -34,18 +28,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-/**
- * 更新步骤指示器状态
- */
 function updateStepIndicator(currentStep) {
     const steps = document.querySelectorAll('.step');
 
     steps.forEach((step, index) => {
         const stepNum = index + 1;
 
-        // 如果模型已导入，针对步骤3(配置特征)和步骤4(查看结果)特殊处理
         if (isModelImported && currentStep === 4) {
-            // 导入模型预测时，直接跳到结果步骤
             if (stepNum === 3) {
                 step.classList.add('completed');
                 step.classList.remove('active');
@@ -67,9 +56,6 @@ function updateStepIndicator(currentStep) {
     });
 }
 
-/**
- * 从API获取可用模型列表
- */
 async function fetchAvailableModels() {
     try {
         const response = await fetch(`${API_BASE_URL}/available-models`);
@@ -89,18 +75,13 @@ async function fetchAvailableModels() {
     }
 }
 
-/**
- * 填充模型选择下拉框
- */
 function populateModelSelect(models) {
     const modelSelect = document.getElementById('model');
 
-    // 清空现有选项（保留"请选择模型"提示）
     while (modelSelect.options.length > 1) {
         modelSelect.remove(1);
     }
 
-    // 添加模型选项
     for (const [id, name] of Object.entries(models)) {
         const option = document.createElement('option');
         option.value = id;
@@ -109,9 +90,6 @@ function populateModelSelect(models) {
     }
 }
 
-/**
- * 处理文件上传变化
- */
 async function handleFileChange(event) {
     const fileInput = event.target;
 
@@ -122,10 +100,8 @@ async function handleFileChange(event) {
 
     const file = fileInput.files[0];
 
-    // 更新步骤指示器
     updateStepIndicator(1);
 
-    // 检查文件格式
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
         showError('file-error', '请上传.xlsx、.xls或.csv格式的文件');
         return;
@@ -135,11 +111,9 @@ async function handleFileChange(event) {
     showLoading(true);
 
     try {
-        // 创建表单数据
         const formData = new FormData();
         formData.append('file', file);
 
-        // 发送请求获取文件列名
         const response = await fetch(`${API_BASE_URL}/get-columns`, {
             method: 'POST',
             body: formData
@@ -151,12 +125,10 @@ async function handleFileChange(event) {
 
         const data = await response.json();
 
-        // 保存列名并显示选择界面
         fileColumns = data.columns;
         displayColumnSelections(fileColumns);
         document.getElementById('columns-selection').style.display = 'block';
 
-        // 更新步骤指示器
         updateStepIndicator(2);
 
     } catch (error) {
@@ -167,36 +139,27 @@ async function handleFileChange(event) {
     }
 }
 
-/**
- * 显示列名选择界面
- */
 function displayColumnSelections(columns) {
-    // 清空现有选项
     xColumns = [];
     yColumn = '';
 
-    // 显示特征列选择
     const xColumnsContainer = document.getElementById('x-columns-container');
     xColumnsContainer.innerHTML = '';
 
-    // 昚示目标列选择
     const yColumnContainer = document.getElementById('y-column-container');
     yColumnContainer.innerHTML = '';
 
-    // 更新计数器初始状态
     updateColumnsCounter('x', 0);
     updateColumnsCounter('y', '');
 
-    // 设置搜索框和全选按钮事件
     setupSearchFilter('x-search', 'x-columns-container');
     setupSearchFilter('y-search', 'y-column-container');
 
     document.getElementById('select-all-x').addEventListener('click', () => selectAllColumns(true));
     document.getElementById('deselect-all-x').addEventListener('click', () => selectAllColumns(false));
 
-    // 填充列选项
     columns.forEach(column => {
-        // 为X列创建复选框
+        // X列选项
         const xColumnItem = document.createElement('div');
         xColumnItem.className = 'column-item';
         xColumnItem.dataset.columnName = column;
@@ -215,12 +178,9 @@ function displayColumnSelections(columns) {
         xColumnItem.appendChild(xLabel);
         xColumnsContainer.appendChild(xColumnItem);
 
-        // 为整个列项添加点击事件
         xColumnItem.addEventListener('click', function (e) {
-            // 如果点击的是复选框本身，不需要额外处理
             if (e.target !== xCheckbox) {
                 xCheckbox.checked = !xCheckbox.checked;
-                // 手动触发change事件
                 const event = new Event('change');
                 xCheckbox.dispatchEvent(event);
             }
@@ -228,12 +188,10 @@ function displayColumnSelections(columns) {
 
         xCheckbox.addEventListener('change', function () {
             if (this.checked) {
-                // 将列添加到特征列数组
                 if (!xColumns.includes(column)) {
                     xColumns.push(column);
                     xColumnItem.classList.add('selected');
                 }
-                // 如果该列被选为目标列，则取消选择
                 if (yColumn === column) {
                     document.getElementById(`y-${column}`).checked = false;
                     document.querySelector(`.column-item[data-column-name="${column}"]`).classList.remove('selected');
@@ -241,29 +199,24 @@ function displayColumnSelections(columns) {
                     updateColumnsCounter('y', '');
                 }
 
-                // 更新计数器
                 updateColumnsCounter('x', xColumns.length);
 
-                // 如果至少选择了一个特征列和一个目标列，更新步骤
                 if (xColumns.length > 0 && yColumn) {
                     updateStepIndicator(3);
                 }
             } else {
-                // 从特征列数组中移除
                 xColumns = xColumns.filter(col => col !== column);
                 xColumnItem.classList.remove('selected');
 
-                // 更新计数器
                 updateColumnsCounter('x', xColumns.length);
 
-                // 如果没有选择特征列，退回步骤
                 if (xColumns.length === 0) {
                     updateStepIndicator(2);
                 }
             }
         });
 
-        // 为Y列创建单选按钮
+        // Y列选项
         const yColumnItem = document.createElement('div');
         yColumnItem.className = 'column-item';
         yColumnItem.dataset.columnName = column;
@@ -283,12 +236,9 @@ function displayColumnSelections(columns) {
         yColumnItem.appendChild(yLabel);
         yColumnContainer.appendChild(yColumnItem);
 
-        // 为整个列项添加点击事件
         yColumnItem.addEventListener('click', function (e) {
-            // 如果点击的是单选框本身，不需要额外处理
             if (e.target !== yRadio) {
                 yRadio.checked = true;
-                // 手动触发change事件
                 const event = new Event('change');
                 yRadio.dispatchEvent(event);
             }
@@ -296,18 +246,15 @@ function displayColumnSelections(columns) {
 
         yRadio.addEventListener('change', function () {
             if (this.checked) {
-                // 先移除之前选中项的样式
                 if (yColumn) {
                     const prevItem = document.querySelector(`.column-item[data-column-name="${yColumn}"]`);
                     if (prevItem) prevItem.classList.remove('selected');
                 }
 
-                // 设置目标列
                 yColumn = column;
                 yColumnItem.classList.add('selected');
                 updateColumnsCounter('y', yColumn);
 
-                // 如果该列被选为特征列，则取消选择
                 const xCheckbox = document.getElementById(`x-${column}`);
                 if (xCheckbox && xCheckbox.checked) {
                     xCheckbox.checked = false;
@@ -316,7 +263,6 @@ function displayColumnSelections(columns) {
                     updateColumnsCounter('x', xColumns.length);
                 }
 
-                // 如果至少选择了一个特征列和一个目标列，更新步骤
                 if (xColumns.length > 0 && yColumn) {
                     updateStepIndicator(3);
                 }
@@ -325,9 +271,6 @@ function displayColumnSelections(columns) {
     });
 }
 
-/**
- * 设置搜索过滤功能
- */
 function setupSearchFilter(searchId, containerId) {
     const searchInput = document.getElementById(searchId);
 
@@ -347,29 +290,20 @@ function setupSearchFilter(searchId, containerId) {
     });
 }
 
-/**
- * 全选或取消全选特征列
- */
 function selectAllColumns(select) {
     const xColumnsContainer = document.getElementById('x-columns-container');
-    const checkboxes = xColumnsContainer.querySelectorAll('.column-checkbox:not([disabled])');
     const visibleItems = xColumnsContainer.querySelectorAll('.column-item:not(.hidden-column)');
 
     visibleItems.forEach(item => {
         const checkbox = item.querySelector('.column-checkbox');
         if (checkbox && checkbox.checked !== select) {
             checkbox.checked = select;
-
-            // 手动触发change事件
             const event = new Event('change');
             checkbox.dispatchEvent(event);
         }
     });
 }
 
-/**
- * 更新列选择计数器
- */
 function updateColumnsCounter(type, count) {
     if (type === 'x') {
         document.querySelector('#x-columns-counter span').textContent = count;
@@ -378,22 +312,15 @@ function updateColumnsCounter(type, count) {
     }
 }
 
-/**
- * 处理开始训练按钮点击
- */
 async function handleTrainButtonClick() {
-    // 重置错误信息
     clearErrors();
-    hideImportSuccessMessage(); // 隐藏导入成功消息
+    hideImportSuccessMessage();
 
-    // 验证输入
     if (!validateInputs()) {
         return;
     }
 
-    // 显示加载状态
     showLoading(true);
-    // 更新加载消息，显示是否使用早停
     const modelValue = document.getElementById('model').value;
     if (modelValue.includes('nn_') || modelValue.includes('emax_')) {
         const useEarlyStopping = document.getElementById('early-stopping').checked;
@@ -404,32 +331,25 @@ async function handleTrainButtonClick() {
         document.querySelector('#loading p').textContent = "正在处理数据并训练模型，请稍候...";
     }
 
-    // 隐藏相关按钮
     document.getElementById('export-model-button').style.display = 'none';
     document.getElementById('predict-imported-button').style.display = 'none';
-    isModelImported = false; // 重置导入模型状态
+    isModelImported = false;
 
-    // 准备表单数据
     const formData = new FormData();
     formData.append('file', document.getElementById('file').files[0]);
     formData.append('x_columns', JSON.stringify(xColumns));
     formData.append('y_column', yColumn);
     formData.append('model_name', document.getElementById('model').value);
     
-    // 添加训练参数
     if (modelValue.includes('nn_') || modelValue.includes('emax_')) {
         const epochs = parseInt(document.getElementById('epochs').value);
         const useEarlyStopping = document.getElementById('early-stopping').checked;
         
-        // 确保epochs是有效值
         formData.append('epochs', isNaN(epochs) || epochs < 1 ? 100 : epochs);
         formData.append('use_early_stopping', String(useEarlyStopping));
-        
-        console.log(`训练参数: epochs=${epochs}, use_early_stopping=${useEarlyStopping}`);
     }
 
     try {
-        // 发送API请求
         const response = await fetch(`${API_BASE_URL}/train`, {
             method: 'POST',
             body: formData
@@ -442,16 +362,11 @@ async function handleTrainButtonClick() {
 
         const result = await response.json();
 
-        // 处理结果
         displayResults(result);
-        // 更新步骤指示器
         updateStepIndicator(4);
-        // 显示导出模型按钮
         document.getElementById('export-model-button').style.display = 'inline-block';
-        // 更新UI状态
         updateUIAfterModelStatusChange();
 
-        // 平滑滚动到结果区域
         document.getElementById('results').scrollIntoView({
             behavior: 'smooth',
             block: 'start'
@@ -465,13 +380,9 @@ async function handleTrainButtonClick() {
     }
 }
 
-/**
- * 验证所有输入
- */
 function validateInputs() {
     let isValid = true;
 
-    // 验证文件上传
     const fileInput = document.getElementById('file');
     if (!fileInput.files || fileInput.files.length === 0) {
         showError('file-error', '请上传数据文件');
@@ -484,20 +395,17 @@ function validateInputs() {
         }
     }
 
-    // 验证模型选择
     const modelSelect = document.getElementById('model');
     if (!modelSelect.value) {
         showError('model-error', '请选择一个模型');
         isValid = false;
     }
 
-    // 验证特征列
     if (xColumns.length === 0) {
         showError('x-columns-error', '请至少选择一个特征列');
         isValid = false;
     }
 
-    // 验证目标列
     if (!yColumn) {
         showError('y-column-error', '请选择一个目标列');
         isValid = false;
@@ -506,15 +414,11 @@ function validateInputs() {
     return isValid;
 }
 
-/**
- * 显示错误信息
- */
 function showError(elementId, message) {
     const element = document.getElementById(elementId);
     if (element) {
         element.textContent = message;
         element.style.display = 'block';
-        // 添加错误动画
         element.classList.add('animate-error');
         setTimeout(() => {
             element.classList.remove('animate-error');
@@ -522,9 +426,6 @@ function showError(elementId, message) {
     }
 }
 
-/**
- * 清除所有错误信息
- */
 function clearErrors() {
     const errorElements = document.querySelectorAll('.error');
     errorElements.forEach(element => {
@@ -533,9 +434,6 @@ function clearErrors() {
     });
 }
 
-/**
- * 显示/隐藏加载状态
- */
 function showLoading(isLoading) {
     const loadingElement = document.getElementById('loading');
     const trainButton = document.getElementById('train-button');
@@ -549,35 +447,25 @@ function showLoading(isLoading) {
     }
 }
 
-/**
- * 显示结果
- */
 function displayResults(result) {
     const resultsElement = document.getElementById('results');
     resultsElement.style.display = 'block';
 
-    // 清空旧数据
     document.getElementById('metrics-table').getElementsByTagName('tbody')[0].innerHTML = '';
 
-    // 显示指标
     if (result.metrics) {
         displayMetrics(result.metrics);
     }
 
-    // 昚示图表
     if (result.plots) {
         displayPlots(result.plots);
     }
 }
 
-/**
- * 显示评估指标
- */
 function displayMetrics(metrics) {
     const metricsTable = document.getElementById('metrics-table').getElementsByTagName('tbody')[0];
     metricsTable.innerHTML = '';
 
-    // 指标名称映射
     const metricNames = {
         'accuracy': '准确率',
         'precision': '精确率',
@@ -591,13 +479,11 @@ function displayMetrics(metrics) {
         'mae': '平均绝对误差(MAE)'
     };
 
-    // 显示顺序
     const displayOrder = [
         'accuracy', 'precision', 'recall', 'f1', 'auc', 'specificity',
         'r2', 'rmse', 'mse', 'mae'
     ];
 
-    // 按显示顺序添加指标
     displayOrder.forEach(key => {
         if (metrics.hasOwnProperty(key)) {
             const value = metrics[key];
@@ -606,10 +492,8 @@ function displayMetrics(metrics) {
             const valueCell = row.insertCell(1);
 
             nameCell.textContent = metricNames[key] || key;
-            // 格式化数值（保留4位小数）
             valueCell.textContent = typeof value === 'number' ? value.toFixed(4) : value;
 
-            // 为良好的指标值添加颜色
             if ((key === 'accuracy' || key === 'precision' || key === 'recall' || key === 'f1' || key === 'auc' || key === 'r2') && value > 0.7) {
                 valueCell.style.color = 'var(--success-color)';
                 valueCell.style.fontWeight = 'bold';
@@ -623,24 +507,19 @@ function displayMetrics(metrics) {
         }
     });
 
-    // 添加其他未在显示顺序中的指标（如果有的话）
     for (const [key, value] of Object.entries(metrics)) {
-        if (key === 'confusion_matrix') continue; // 混淆矩阵在图表中展示
-        if (displayOrder.includes(key)) continue; // 已经显示的指标跳过
+        if (key === 'confusion_matrix') continue;
+        if (displayOrder.includes(key)) continue;
 
         const row = metricsTable.insertRow();
         const nameCell = row.insertCell(0);
         const valueCell = row.insertCell(1);
 
         nameCell.textContent = metricNames[key] || key;
-        // 格式化数值（保留4位小数）
         valueCell.textContent = typeof value === 'number' ? value.toFixed(4) : value;
     }
 }
 
-/**
- * 显示图表
- */
 function displayPlots(plots) {
     // 特征重要性图
     const featureImportancePlot = document.getElementById('feature-importance-plot');
@@ -652,10 +531,9 @@ function displayPlots(plots) {
         featureImportanceTitle.textContent = '特征重要性';
         featureImportanceCard.style.display = 'block';
         
-        // 如果存在其他特征重要性可视化，添加到额外图表容器中
+        // 处理其他可视化变体
         const extraPlotsContainer = document.getElementById('extra-plots-container');
         
-        // 添加特征重要性的可视化变体
         if (plots.feature_importance_horizontal_bar) {
             addExtraPlot(extraPlotsContainer, plots.feature_importance_horizontal_bar, '特征重要性排序', 'bar-chart-steps');
         }
@@ -701,7 +579,7 @@ function displayPlots(plots) {
         learningCurveCard.style.display = 'none';
     }
 
-    // 预测结果图 (优先级: ROC曲线 > 混淆矩阵 > 预测vs真实)
+    // 预测结果图
     const predictionPlot = document.getElementById('prediction-plot');
     const predictionCard = predictionPlot.closest('.card');
     const predictionTitle = predictionCard.querySelector('h2');
@@ -729,12 +607,11 @@ function displayPlots(plots) {
         predictionCard.style.display = 'none';
     }
 
-    // 检查是否有额外图表需要显示
+    // 额外图表
     const extraPlotsContainer = document.getElementById('extra-plots-container');
     if (extraPlotsContainer) {
-        extraPlotsContainer.innerHTML = ''; // 清空容器
+        extraPlotsContainer.innerHTML = '';
         
-        // 添加特征重要性的可视化变体
         if (plots.feature_importance_horizontal_bar) {
             addExtraPlot(extraPlotsContainer, plots.feature_importance_horizontal_bar, '特征重要性排序', 'bar-chart-steps');
         }
@@ -755,22 +632,18 @@ function displayPlots(plots) {
             addExtraPlot(extraPlotsContainer, plots.feature_importance_cumulative, '特征重要性累积图', 'graph-up');
         }
         
-        // 添加PR曲线
         if (plots.pr_curve) {
             addExtraPlot(extraPlotsContainer, plots.pr_curve, '精确率-召回率曲线', 'graph-up');
         }
         
-        // 添加残差图
         if (plots.residuals_plot) {
             addExtraPlot(extraPlotsContainer, plots.residuals_plot, '残差分布图', 'graph-down');
         }
         
-        // 添加残差分布图
         if (plots.residuals_hist) {
             addExtraPlot(extraPlotsContainer, plots.residuals_hist, '残差直方图', 'bar-chart');
         }
         
-        // 如果有额外图表显示容器
         if (extraPlotsContainer.children.length > 0) {
             extraPlotsContainer.style.display = 'block';
         } else {
@@ -779,17 +652,12 @@ function displayPlots(plots) {
     }
 }
 
-/**
- * 添加额外的图表到容器
- */
 function addExtraPlot(container, plotData, title, iconName) {
     const cardDiv = document.createElement('div');
     cardDiv.className = 'card';
     
-    // 使用不同的图标 
-    let iconClass = 'graph-up';  // 默认图标
+    let iconClass = 'graph-up';
     
-    // 根据标题或提供的图标名称选择合适的图标
     if (title.includes('相关性') || iconName === 'grid-3x3') {
         iconClass = 'grid-3x3';
     } else if (title.includes('饼图') || title.includes('分布') || iconName === 'pie-chart') {
@@ -814,9 +682,6 @@ function addExtraPlot(container, plotData, title, iconName) {
     container.appendChild(cardDiv);
 }
 
-/**
- * 处理导出模型按钮点击
- */
 async function handleExportModelClick() {
     showLoading(true);
     clearErrors();
@@ -831,7 +696,6 @@ async function handleExportModelClick() {
             throw new Error(errorData.detail || `HTTP错误 ${response.status}`);
         }
 
-        // 创建下载链接
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -843,7 +707,6 @@ async function handleExportModelClick() {
         window.URL.revokeObjectURL(url);
         a.remove();
 
-        // 显示成功消息
         showImportSuccessMessage('模型导出成功！');
 
     } catch (error) {
@@ -854,9 +717,6 @@ async function handleExportModelClick() {
     }
 }
 
-/**
- * 处理导入模型文件选择变化
- */
 async function handleImportModelFileChange(event) {
     const fileInput = event.target;
     if (!fileInput.files || fileInput.files.length === 0) {
@@ -888,12 +748,10 @@ async function handleImportModelFileChange(event) {
             throw new Error(result.detail || `HTTP错误 ${response.status}`);
         }
 
-        // 显示成功消息
         showImportSuccessMessage(result.message);
-        // 设置导入模型状态
         isModelImported = true;
         updateUIAfterModelStatusChange();
-        updateStepIndicator(3); // 导入后准备配置新数据的特征
+        updateStepIndicator(3);
 
     } catch (error) {
         console.error('导入模型失败:', error);
@@ -902,18 +760,14 @@ async function handleImportModelFileChange(event) {
         updateUIAfterModelStatusChange();
     } finally {
         showLoading(false);
-        fileInput.value = ''; // 重置文件输入框
+        fileInput.value = '';
     }
 }
 
-/**
- * 处理使用导入模型预测按钮点击
- */
 async function handlePredictWithImportedModelClick() {
     clearErrors();
     hideImportSuccessMessage();
 
-    // 验证新数据文件和列选择
     const fileInput = document.getElementById('file');
     if (!fileInput.files || fileInput.files.length === 0) {
         showError('file-error', '请为导入的模型上传新的数据文件进行预测');
@@ -955,11 +809,9 @@ async function handlePredictWithImportedModelClick() {
             throw new Error(result.detail || `HTTP错误 ${response.status}`);
         }
 
-        // 显示预测结果
         displayResults(result);
-        updateStepIndicator(4); // 显示结果步骤
+        updateStepIndicator(4);
 
-        // 平滑滚动到结果区域
         document.getElementById('results').scrollIntoView({
             behavior: 'smooth',
             block: 'start'
@@ -973,25 +825,16 @@ async function handlePredictWithImportedModelClick() {
     }
 }
 
-/**
- * 显示导入成功消息
- */
 function showImportSuccessMessage(message) {
     const successElement = document.getElementById('import-model-success');
     successElement.textContent = message;
     successElement.style.display = 'block';
 }
 
-/**
- * 隐藏导入成功消息
- */
 function hideImportSuccessMessage() {
     document.getElementById('import-model-success').style.display = 'none';
 }
 
-/**
- * 更新UI以反映模型状态变化
- */
 function updateUIAfterModelStatusChange() {
     const trainButton = document.getElementById('train-button');
     const exportButton = document.getElementById('export-model-button');
@@ -999,12 +842,10 @@ function updateUIAfterModelStatusChange() {
 
     if (isModelImported) {
         trainButton.innerHTML = '<i class="bi bi-play-fill"></i> 开始新训练';
-        exportButton.style.display = 'inline-block'; // 导入的模型也可以导出
+        exportButton.style.display = 'inline-block';
         predictImportedButton.style.display = 'inline-block';
     } else {
         trainButton.innerHTML = '<i class="bi bi-play-fill"></i> 开始训练';
         predictImportedButton.style.display = 'none';
-        // 不要在这里隐藏导出按钮，因为训练成功后也需要显示
-        // 仅在调用handleTrainButtonClick时才隐藏，然后在训练成功后再显示
     }
 }
