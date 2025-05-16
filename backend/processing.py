@@ -367,10 +367,55 @@ def calculate_feature_importance(X_train, y_train, feature_names, model_name):
         # 计算相关矩阵
         corr = X_top.corr()
         
-        mask = np.triu(np.ones_like(corr, dtype=bool))
-        sns.heatmap(corr, mask=mask, cmap='coolwarm', vmax=1, vmin=-1, center=0,
-                    annot=True, fmt='.2f', square=True, linewidths=.5)
-        plt.title('Correlation Matrix of Top Features')
+        # 检查是否有长特征名（超过15个字符）
+        has_long_features = any(len(str(f)) > 20 for f in top_features)
+        
+        if has_long_features:
+            # 为特征创建简短的标识符
+            short_labels = []
+            for i in range(len(top_features)):
+                # 使用ASCII字符，从A开始
+                if i < 26:
+                    short_labels.append(chr(65 + i))  # A-Z
+                else:
+                    # 双字母 AA, AB, ...
+                    short_labels.append(chr(65 + (i // 26) - 1) + chr(65 + (i % 26)))
+            
+            # 创建映射字典
+            label_mapping = dict(zip(top_features, short_labels))
+            
+            # 重命名相关矩阵的索引和列名
+            corr.index = [label_mapping[feat] for feat in corr.index]
+            corr.columns = [label_mapping[feat] for feat in corr.columns]
+            
+            # 创建一个足够大的图形，包含热力图和图例
+            fig = plt.figure(figsize=(14, 10))
+            
+            # 在左侧创建热力图
+            ax1 = plt.subplot2grid((1, 5), (0, 0), colspan=3)
+            mask = np.triu(np.ones_like(corr, dtype=bool))
+            sns.heatmap(corr, mask=mask, cmap='coolwarm', vmax=1, vmin=-1, center=0,
+                        annot=True, fmt='.2f', square=True, linewidths=.5, ax=ax1)
+            ax1.set_title('特征相关性矩阵')
+            
+            # 在右侧添加图例
+            ax2 = plt.subplot2grid((1, 5), (0, 3), colspan=2)
+            ax2.axis('off')
+            legend_text = "Feature Identifier Mapping:\n\n"
+            for feature, short_label in label_mapping.items():
+                if len(str(feature)) > 25:
+                    feature_display = str(feature)[:22] + "..."
+                else:
+                    feature_display = str(feature)
+                legend_text += f"{short_label}: {feature_display}\n"
+            ax2.text(0, 0.5, legend_text, fontsize=10, va='center', ha='left')
+        else:
+            # 如果没有长特征名，使用原始的热力图代码
+            mask = np.triu(np.ones_like(corr, dtype=bool))
+            sns.heatmap(corr, mask=mask, cmap='coolwarm', vmax=1, vmin=-1, center=0,
+                        annot=True, fmt='.2f', square=True, linewidths=.5)
+            plt.title('特征相关性矩阵')
+        
         plt.tight_layout()
         visualizations['correlation'] = fig_to_base64(plt.gcf())
         plt.close()
