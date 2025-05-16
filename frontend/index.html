@@ -547,6 +547,79 @@
         .hidden-column {
             display: none;
         }
+
+        /* 开关样式 */
+        .toggle-switch-container {
+            display: flex;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-right: 10px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--primary-color);
+        }
+
+        input:focus + .toggle-slider {
+            box-shadow: 0 0 1px var(--primary-color);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+
+        .toggle-label {
+            font-weight: 500;
+        }
+
+        .form-text {
+            color: var(--text-light);
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: var(--primary-dark);
+        }
     </style>
 </head>
 
@@ -583,6 +656,36 @@
                     <!-- 模型选项将通过JavaScript动态加载 -->
                 </select>
                 <div class="error" id="model-error"></div>
+            </div>
+
+            <!-- 添加训练参数设置 -->
+            <div id="training-params" style="display: none;">
+                <div class="section-title">
+                    <i class="bi bi-sliders"></i>
+                    <h3>训练参数设置</h3>
+                </div>
+                <div class="grid">
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label for="epochs"><i class="bi bi-repeat"></i> 训练轮数(Epochs)</label>
+                            <input type="number" id="epochs" min="1" max="1000" value="100" class="form-control">
+                            <small class="form-text">设置训练迭代的轮数，较大的值可能提高准确率但会增加训练时间</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label for="early-stopping"><i class="bi bi-shield-check"></i> 使用早停机制</label>
+                            <div class="toggle-switch-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="early-stopping" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="toggle-label">启用</span>
+                            </div>
+                            <small class="form-text">当验证集性能不再提升时自动停止训练，防止过拟合</small>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="columns-selection" style="display: none;">
@@ -660,7 +763,7 @@
             <div class="card">
                 <div class="section-title">
                     <i class="bi bi-bar-chart-fill"></i>
-                    <h2>模型评估指标</2>
+                    <h2>模型评估指标</h2>
                 </div>
                 <div id="metrics-container">
                     <table class="metrics-table" id="metrics-table">
@@ -671,6 +774,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            <!-- 指标将在这里动态添加 -->
                         </tbody>
                     </table>
                 </div>

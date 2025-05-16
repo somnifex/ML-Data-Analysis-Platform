@@ -798,6 +798,16 @@ def generate_plots(
             plt.close()
 
     y_pred = model.predict(X_test)
+    
+    # 确保 y_pred 是一维数组，与 y_test 兼容
+    if isinstance(y_pred, np.ndarray) and y_pred.ndim > 1:
+        if y_pred.shape[1] == 1:
+            y_pred = y_pred.flatten()
+        elif y_pred.shape[0] == y_pred.shape[1]:  # 可能是方阵
+            y_pred = np.diag(y_pred).flatten()
+        else:
+            # 其他情况，默认取第一列
+            y_pred = y_pred[:, 0]
 
     if is_classification:
         cm = confusion_matrix(y_test, y_pred)
@@ -937,9 +947,28 @@ def generate_plots(
         plots["prediction_vs_actual"] = fig_to_base64(plt.gcf())
         plt.close()
 
-        residuals = y_test - y_pred
+        # 再次确保 y_pred 和 y_test 都是一维的，以计算残差
+        if isinstance(y_test, pd.Series):
+            y_test_values = y_test.values
+        else:
+            y_test_values = y_test
+            
+        if y_test_values.ndim > 1:
+            y_test_values = y_test_values.flatten()
+            
+        if isinstance(y_pred, pd.Series):
+            y_pred_values = y_pred.values
+        else:
+            y_pred_values = y_pred
+            
+        if y_pred_values.ndim > 1:
+            y_pred_values = y_pred_values.flatten()
+            
+        # 计算残差
+        residuals = y_test_values - y_pred_values
+        
         plt.figure(figsize=(8, 6))
-        plt.scatter(y_pred, residuals, alpha=0.5)
+        plt.scatter(y_pred_values, residuals, alpha=0.5)
         plt.axhline(y=0, color='r', linestyle='--')
         plt.xlabel("Predicted Values")
         plt.ylabel("Residuals")

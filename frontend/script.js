@@ -21,6 +21,15 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('model').addEventListener('change', function () {
         if (this.value) {
             updateStepIndicator(2);
+            
+            // 检查是否为神经网络模型，如果是则显示训练参数
+            const modelValue = this.value;
+            const trainingParamsDiv = document.getElementById('training-params');
+            if (modelValue.includes('nn_') || modelValue.includes('emax_')) {
+                trainingParamsDiv.style.display = 'block';
+            } else {
+                trainingParamsDiv.style.display = 'none';
+            }
         }
     });
 });
@@ -170,7 +179,7 @@ function displayColumnSelections(columns) {
     const xColumnsContainer = document.getElementById('x-columns-container');
     xColumnsContainer.innerHTML = '';
 
-    // 显示目标列选择
+    // 昚示目标列选择
     const yColumnContainer = document.getElementById('y-column-container');
     yColumnContainer.innerHTML = '';
 
@@ -384,6 +393,16 @@ async function handleTrainButtonClick() {
 
     // 显示加载状态
     showLoading(true);
+    // 更新加载消息，显示是否使用早停
+    const modelValue = document.getElementById('model').value;
+    if (modelValue.includes('nn_') || modelValue.includes('emax_')) {
+        const useEarlyStopping = document.getElementById('early-stopping').checked;
+        const epochs = document.getElementById('epochs').value;
+        document.querySelector('#loading p').textContent = 
+            `正在训练模型... (${epochs}轮${useEarlyStopping ? '，启用早停' : '，不使用早停'})`;
+    } else {
+        document.querySelector('#loading p').textContent = "正在处理数据并训练模型，请稍候...";
+    }
 
     // 隐藏相关按钮
     document.getElementById('export-model-button').style.display = 'none';
@@ -396,6 +415,18 @@ async function handleTrainButtonClick() {
     formData.append('x_columns', JSON.stringify(xColumns));
     formData.append('y_column', yColumn);
     formData.append('model_name', document.getElementById('model').value);
+    
+    // 添加训练参数
+    if (modelValue.includes('nn_') || modelValue.includes('emax_')) {
+        const epochs = parseInt(document.getElementById('epochs').value);
+        const useEarlyStopping = document.getElementById('early-stopping').checked;
+        
+        // 确保epochs是有效值
+        formData.append('epochs', isNaN(epochs) || epochs < 1 ? 100 : epochs);
+        formData.append('use_early_stopping', String(useEarlyStopping));
+        
+        console.log(`训练参数: epochs=${epochs}, use_early_stopping=${useEarlyStopping}`);
+    }
 
     try {
         // 发送API请求
@@ -533,7 +564,7 @@ function displayResults(result) {
         displayMetrics(result.metrics);
     }
 
-    // 显示图表
+    // 昚示图表
     if (result.plots) {
         displayPlots(result.plots);
     }

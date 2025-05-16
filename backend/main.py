@@ -56,6 +56,9 @@ async def get_available_models():
         # 神经网络模型
         "nn_classifier": "神经网络分类器",
         "nn_regressor": "神经网络回归器",
+        # 添加EMAX注意力模型
+        "emax_classifier": "注意力增强神经网络分类器",
+        "emax_regressor": "注意力增强神经网络回归器",
         # 线性模型
         "linear_regression": "线性回归",
         "logistic_regression": "逻辑回归",
@@ -126,6 +129,8 @@ async def train_model(
     x_columns: str = Form(...),
     y_column: str = Form(...),
     model_name: str = Form(...),
+    epochs: int = Form(100),  # 默认100轮
+    use_early_stopping: str = Form("true"),  # 默认使用早停
 ):
     """
     接收数据文件和参数，训练模型并返回结果
@@ -135,6 +140,8 @@ async def train_model(
     - x_columns: JSON格式的特征列名列表
     - y_column: 目标列名
     - model_name: 选择的模型名称
+    - epochs: 训练轮数(对于神经网络模型)
+    - use_early_stopping: 是否使用早停机制(对于神经网络模型)
 
     返回:
     - metrics: 评估指标字典
@@ -193,13 +200,46 @@ async def train_model(
                 from models import NeuralRegressor
 
                 model.net = NeuralRegressor(input_size_for_model)
+            elif model_name == "emax_classifier":
+                from models import EMAXClassifier
+                
+                num_classes = (
+                    len(fitted_preprocessing_info.get("target_encoder").classes_)
+                    if fitted_preprocessing_info.get("target_encoder")
+                    else 2
+                )
+                model.net = EMAXClassifier(
+                    input_size_for_model, num_classes=num_classes
+                )
+            elif model_name == "emax_regressor":
+                from models import EMAXRegressor
+                
+                model.net = EMAXRegressor(input_size_for_model)
+                
             model.optimizer = torch.optim.Adam(model.net.parameters(), lr=0.001)
 
         importance_data = calculate_feature_importance(
             X_train, y_train, X_train.columns.tolist(), model_name
         )
+        
+        # 处理训练参数
+        use_early_stopping_bool = use_early_stopping.lower() == "true"
+        
+        # 如果是PyTorch模型，应用自定义训练参数
+        if isinstance(model, PyTorchModel):
+            if use_early_stopping_bool:
+                # 使用早停，设置合理的patience值
+                patience = 10
+                print(f"使用早停训练，epochs={epochs}, patience={patience}")
+                training_history = model.fit(X_train, y_train, epochs=epochs, patience=patience)
+            else:
+                # 禁用早停，明确设置patience=None
+                print(f"不使用早停训练，epochs={epochs}, patience=None")
+                training_history = model.fit(X_train, y_train, epochs=epochs, patience=None)
+        else:
+            # 非PyTorch模型使用默认训练参数
+            training_history = model.fit(X_train, y_train)
 
-        training_history = model.fit(X_train, y_train)
         metrics = evaluate_model(model, X_test, y_test, is_classification)
         plots = generate_plots(
             model,
@@ -383,6 +423,19 @@ async def import_model_package(file: UploadFile = File(...)):
                 )  # Recreate with correct input_size
             elif model_name_backend == "nn_regressor":
                 model_shell.net = type(model_shell.net)(input_size)
+            elif model_name_backend == "emax_classifier":
+                num_classes = (
+                    len(preprocessing_info.get("target_encoder").classes_)
+                    if preprocessing_info.get("target_encoder")
+                    else 2
+                )
+                from models import EMAXClassifier
+                model_shell.net = EMAXClassifier(
+                    input_size, num_classes=num_classes
+                )
+            elif model_name_backend == "emax_regressor":
+                from models import EMAXRegressor
+                model_shell.net = EMAXRegressor(input_size)
 
         model_shell.load_model(model_content_actual_path)
 
