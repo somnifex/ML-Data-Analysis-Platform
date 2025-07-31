@@ -1,8 +1,5 @@
 # ML Data Analysis Platform
 
-
-
-
 *Read this in [中文 (Chinese)](README_zh_CN.md)*
 
 A demo for a machine learning data analysis platform – not overly powerful, but designed to allow users to train and evaluate common ML models without any coding. Simply upload your data, select a model, and get professional visualizations and metrics analysis in seconds. This demo isn't exhaustive, and we encourage users to modify it to suit their specific needs.
@@ -43,9 +40,9 @@ A demo for a machine learning data analysis platform – not overly powerful, bu
    python main.py
    ```
 4. Open the frontend in your browser
-
    - Navigate to `frontend/index.html` in your file explorer and open it with your browser
    - Or run a simple HTTP server:
+
      ```bash
      cd frontend
      python -m http.server 8000

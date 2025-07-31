@@ -58,12 +58,16 @@ function updateStepIndicator(currentStep) {
 
 async function fetchAvailableModels() {
     try {
-        const response = await fetch(`${API_BASE_URL}/available-models`);
+        console.log('正在获取模型列表...');
+        const response = await fetch(`${API_BASE_URL}/api/available-models`);
+        console.log('响应状态:', response.status);
+        
         if (!response.ok) {
             throw new Error(`HTTP错误 ${response.status}`);
         }
 
         const data = await response.json();
+        console.log('获取到的数据:', data);
         populateModelSelect(data.models);
     } catch (error) {
         console.error('获取模型列表失败:', error);
@@ -76,6 +80,7 @@ async function fetchAvailableModels() {
 }
 
 function populateModelSelect(models) {
+    console.log('正在填充模型选择框:', models);
     const modelSelect = document.getElementById('model');
 
     while (modelSelect.options.length > 1) {
@@ -83,11 +88,14 @@ function populateModelSelect(models) {
     }
 
     for (const [id, name] of Object.entries(models)) {
+        console.log(`添加模型: ${id} -> ${name}`);
         const option = document.createElement('option');
         option.value = id;
         option.textContent = name;
         modelSelect.appendChild(option);
     }
+    
+    console.log(`总共添加了 ${Object.keys(models).length} 个模型`);
 }
 
 async function handleFileChange(event) {
@@ -114,7 +122,7 @@ async function handleFileChange(event) {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(`${API_BASE_URL}/get-columns`, {
+        const response = await fetch(`${API_BASE_URL}/api/get-columns`, {
             method: 'POST',
             body: formData
         });
@@ -350,7 +358,7 @@ async function handleTrainButtonClick() {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/train`, {
+        const response = await fetch(`${API_BASE_URL}/api/train`, {
             method: 'POST',
             body: formData
         });
@@ -687,7 +695,7 @@ async function handleExportModelClick() {
     clearErrors();
 
     try {
-        const response = await fetch(`${API_BASE_URL}/export-model`, {
+        const response = await fetch(`${API_BASE_URL}/api/export-model`, {
             method: 'POST'
         });
 
@@ -737,7 +745,7 @@ async function handleImportModelFileChange(event) {
     formData.append('file', file);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/import-model`, {
+        const response = await fetch(`${API_BASE_URL}/api/import-model`, {
             method: 'POST',
             body: formData
         });
@@ -798,7 +806,7 @@ async function handlePredictWithImportedModelClick() {
     formData.append('y_column', yColumn);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/predict-with-imported-model`, {
+        const response = await fetch(`${API_BASE_URL}/api/predict-with-imported-model`, {
             method: 'POST',
             body: formData
         });

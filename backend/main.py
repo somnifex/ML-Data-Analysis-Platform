@@ -13,8 +13,20 @@ import tempfile
 import os
 import shutil
 import torch
+import sys
+import webbrowser
+from threading import Timer
+from fastapi.staticfiles import StaticFiles
 
-from models import get_model, PyTorchModel
+from models import (
+    get_model,
+    PyTorchModel,
+    XGBOOST_AVAILABLE,
+    LIGHTGBM_AVAILABLE,
+    NeuralClassifier,
+    NeuralRegressor,
+    SklearnModelWrapper,
+)
 from processing import (
     preprocess_data,
     apply_saved_preprocessing,
@@ -41,12 +53,32 @@ current_model_package: Dict[str, Any] = {
 }
 
 
+def get_path(relative_path):
+    """获取资源的绝对路径，兼容开发环境和PyInstaller环境"""
+    if hasattr(sys, '_MEIPASS'):
+        # In a bundled app, the base path is the temp directory _MEIPASS
+        # We assume the 'frontend' folder is copied to the root of the bundle.
+        return os.path.join(sys._MEIPASS, relative_path)
+    # In a development environment, we go up one level from 'backend' to the project root
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), relative_path)
+
+# 静态文件目录
+static_files_path = get_path("frontend")
+app.mount("/static", StaticFiles(directory=static_files_path), name="static")
+
 @app.get("/")
-async def root():
-    return {"message": "机器学习模型分析API服务已启动"}
+async def read_root():
+    return FileResponse(os.path.join(static_files_path, 'index.html'))
 
+@app.get("/script.js")
+async def get_script():
+    return FileResponse(os.path.join(static_files_path, 'script.js'), media_type="application/javascript")
 
-@app.get("/available-models")
+@app.get("/api")
+async def api_root():
+    return {"message": "ML Data Analysis Platform API"}
+
+@app.get("/api/available-models")
 async def get_available_models():
     """
     获取所有可用的模型列表
@@ -56,9 +88,6 @@ async def get_available_models():
         # 神经网络模型
         "nn_classifier": "神经网络分类器",
         "nn_regressor": "神经网络回归器",
-        # 添加EMAX注意力模型
-        "emax_classifier": "注意力增强神经网络分类器",
-        "emax_regressor": "注意力增强神经网络回归器",
         # 线性模型
         "linear_regression": "线性回归",
         "logistic_regression": "逻辑回归",
@@ -78,15 +107,9 @@ async def get_available_models():
         "knn_regressor": "K近邻回归器",
     }
 
-    models["random_forest"] = "随机森林"
-
-    from models import XGBOOST_AVAILABLE
-
     if XGBOOST_AVAILABLE:
         models["xgboost_classifier"] = "XGBoost分类器"
         models["xgboost_regressor"] = "XGBoost回归器"
-
-    from models import LIGHTGBM_AVAILABLE
 
     if LIGHTGBM_AVAILABLE:
         models["lightgbm_classifier"] = "LightGBM分类器"
@@ -95,7 +118,7 @@ async def get_available_models():
     return {"models": models}
 
 
-@app.post("/get-columns")
+@app.post("/api/get-columns")
 async def get_columns(file: UploadFile = File(...)):
     """
     获取上传文件的列名
@@ -123,7 +146,7 @@ async def get_columns(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"读取文件失败: {str(e)}")
 
 
-@app.post("/train")
+@app.post("/api/train")
 async def train_model(
     file: UploadFile = File(...),
     x_columns: str = Form(...),
@@ -200,21 +223,6 @@ async def train_model(
                 from models import NeuralRegressor
 
                 model.net = NeuralRegressor(input_size_for_model)
-            elif model_name == "emax_classifier":
-                from models import EMAXClassifier
-                
-                num_classes = (
-                    len(fitted_preprocessing_info.get("target_encoder").classes_)
-                    if fitted_preprocessing_info.get("target_encoder")
-                    else 2
-                )
-                model.net = EMAXClassifier(
-                    input_size_for_model, num_classes=num_classes
-                )
-            elif model_name == "emax_regressor":
-                from models import EMAXRegressor
-                
-                model.net = EMAXRegressor(input_size_for_model)
                 
             model.optimizer = torch.optim.Adam(model.net.parameters(), lr=0.001)
 
@@ -279,7 +287,7 @@ async def train_model(
         )
 
 
-@app.post("/export-model")
+@app.post("/api/export-model")
 async def export_model(background_tasks: BackgroundTasks):
     global current_model_package
     if not current_model_package or not current_model_package["model_object"]:
@@ -341,7 +349,7 @@ async def export_model(background_tasks: BackgroundTasks):
         raise HTTPException(status_code=500, detail=f"导出模型过程中发生错误: {str(e)}")
 
 
-@app.post("/import-model")
+@app.post("/api/import-model")
 async def import_model_package(file: UploadFile = File(...)):
     global current_model_package
     if not file.filename.endswith(".zip"):
@@ -423,19 +431,6 @@ async def import_model_package(file: UploadFile = File(...)):
                 )  # Recreate with correct input_size
             elif model_name_backend == "nn_regressor":
                 model_shell.net = type(model_shell.net)(input_size)
-            elif model_name_backend == "emax_classifier":
-                num_classes = (
-                    len(preprocessing_info.get("target_encoder").classes_)
-                    if preprocessing_info.get("target_encoder")
-                    else 2
-                )
-                from models import EMAXClassifier
-                model_shell.net = EMAXClassifier(
-                    input_size, num_classes=num_classes
-                )
-            elif model_name_backend == "emax_regressor":
-                from models import EMAXRegressor
-                model_shell.net = EMAXRegressor(input_size)
 
         model_shell.load_model(model_content_actual_path)
 
@@ -447,7 +442,7 @@ async def import_model_package(file: UploadFile = File(...)):
         return {"message": f"模型 '{model_name_backend}' 导入成功。"}
 
 
-@app.post("/predict-with-imported-model")
+@app.post("/api/predict-with-imported-model")
 async def predict_with_imported_model_endpoint(
     file: UploadFile = File(...),
     x_columns: str = Form(...),
@@ -526,5 +521,16 @@ async def predict_with_imported_model_endpoint(
             status_code=500, detail=f"使用导入模型预测时出错: {str(e)}\n{tb_str}"
         )
 
+def open_browser():
+    webbrowser.open_new("http://127.0.0.1:19123")
+
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=19123, reload=True)
+    Timer(1, open_browser).start()
+    
+    # Disable colored logging for PyInstaller compatibility in windowed mode
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["default"]["use_colors"] = False
+    log_config["formatters"]["access"]["use_colors"] = False
+    
+    uvicorn.run(app, host="127.0.0.1", port=19123, reload=False, log_config=log_config)
+
