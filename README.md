@@ -28,7 +28,7 @@ A demo for a machine learning data analysis platform – not overly powerful, bu
 1. Clone the repository
 
    ```bash
-   git clone https://github.com/yourusername/ml-data-analysis.git
+   git clone https://github.com/somnifex/ml-data-analysis.git
    cd ml-data-analysis
    ```
 2. Install the required Python packages
